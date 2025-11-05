@@ -32,22 +32,13 @@ class GeminiAgentService {
   private chatHistory: Content[] = [];
 
   constructor() {
-    // Try to load from environment config
-    let apiKey = process.env.GOOGLE_GENERATIVE_AI_API_KEY || process.env.NEXT_PUBLIC_GOOGLE_GENERATIVE_AI_API_KEY;
-    
-    // Fallback to hardcoded config if env vars don't work
-    if (!apiKey) {
-      try {
-        // Use dynamic import to avoid bundling issues
-        const envModule = require("./env");
-        apiKey = envModule.ENV.GOOGLE_GENERATIVE_AI_API_KEY;
-      } catch (e) {
-        console.error("Failed to load environment config", e);
-      }
-    }
+    // Load API key from environment variables
+    const apiKey = process.env.GOOGLE_GENERATIVE_AI_API_KEY;
     
     if (!apiKey) {
-      throw new Error("Google Generative AI API key not configured");
+      throw new Error(
+        "GOOGLE_GENERATIVE_AI_API_KEY is not set. Please check your .env.local file."
+      );
     }
 
     this.genAI = new GoogleGenerativeAI(apiKey);

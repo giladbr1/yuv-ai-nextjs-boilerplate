@@ -37,8 +37,10 @@ The Bria Agentic Generation Interface is a revolutionary creative platform that 
 
 - Node.js 20+ 
 - npm or yarn
-- Bria MCP API credentials
-- Google AI Studio API key
+- **Bria MCP API Token** - Get from Bria dashboard
+- **Google AI Studio API Key** - Get from https://aistudio.google.com/app/apikey
+
+**⚠️ Security Note:** Never commit API keys to version control. Always use `.env.local` file.
 
 ## 🚀 Quick Start
 
@@ -55,21 +57,31 @@ npm install
 
 ### 2. Environment Configuration
 
-Create a `.env.local` file in the root directory:
+Copy the example environment file and add your API keys:
+
+```bash
+# Copy the example file (if using bash/linux/mac)
+cp .env.example .env.local
+
+# Or on Windows PowerShell
+Copy-Item .env.example .env.local
+```
+
+Then edit `.env.local` with your actual API keys:
 
 ```env
-# Gemini AI Configuration
-GOOGLE_GENERATIVE_AI_API_KEY=your_google_ai_key_here
+# Google Generative AI (Gemini) API Key
+GOOGLE_GENERATIVE_AI_API_KEY=your_google_gemini_api_key_here
 
 # Bria MCP Server Configuration
 BRIA_MCP_URL=https://mcp.prod.bria-api.com/mcp
-BRIA_MCP_API_TOKEN=your_bria_token_here
-
-# Optional: Generation Defaults
-DEFAULT_MODEL=Fibo
-DEFAULT_STEPS=50
-DEFAULT_ASPECT_RATIO=1:1
+BRIA_MCP_API_TOKEN=your_bria_api_token_here
 ```
+
+**Important:** 
+- `.env.local` is already in `.gitignore` and will not be committed
+- Never hardcode API keys in source code
+- Use `.env.example` as a reference template
 
 ### 3. Run Development Server
 
