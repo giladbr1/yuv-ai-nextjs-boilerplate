@@ -128,12 +128,22 @@ ENV BRIA_MCP_API_TOKEN=${BRIA_MCP_API_TOKEN}
 
 ## Troubleshooting
 
-### "Environment variable not set" Error
+### "Environment variable not set" Error (Windows Fix)
 
-1. Check `.env.local` exists in project root
+**Problem**: On Windows, Next.js sometimes fails to load `.env.local` properly in server-side code.
+
+**Solution Implemented**: 
+- We use the `dotenv` package to explicitly load `.env.local`
+- `src/lib/env-init.ts` handles this automatically
+- All services import this module first
+
+**If still having issues**:
+1. Check `.env.local` exists in project root (not in `src/` folder)
 2. Verify variable names match exactly (case-sensitive)
 3. Restart the development server after changes
 4. Check for typos or extra spaces
+5. Verify the file path is correct: `C:\...\project-root\.env.local`
+6. Check the terminal logs - you should see: "Loading environment from: ..." and "Environment variables loaded successfully"
 
 ### API Key Not Working
 

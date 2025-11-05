@@ -83,6 +83,8 @@ BRIA_MCP_API_TOKEN=your_bria_api_token_here
 - Never hardcode API keys in source code
 - Use `.env.example` as a reference template
 
+**Windows Users**: The project uses `dotenv` to explicitly load `.env.local` to ensure compatibility with Windows systems where Next.js sometimes fails to load environment variables properly. Check the terminal logs for "Environment variables loaded successfully" confirmation.
+
 ### 3. Run Development Server
 
 ```bash

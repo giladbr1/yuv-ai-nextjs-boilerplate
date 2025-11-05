@@ -1,5 +1,6 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
+import { getEnv } from "./env-init"; // Explicit env loading for Windows compatibility
 
 export interface MCPTool {
   name: string;
@@ -139,8 +140,7 @@ class BriaMCPClient {
       return;
     }
 
-    // Import environment variables from config
-    const { getEnv } = await import("./env");
+    // Get environment variables (env-init automatically loads .env.local)
     const mcpUrl = getEnv("BRIA_MCP_URL");
     const apiToken = getEnv("BRIA_MCP_API_TOKEN");
 

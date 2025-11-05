@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+// IMPORTANT: Import env-init FIRST to ensure environment variables are loaded
+import "@/lib/env-init";
 import { getGeminiAgent } from "@/lib/gemini-agent";
 import { getMCPClient } from "@/lib/mcp-client";
 

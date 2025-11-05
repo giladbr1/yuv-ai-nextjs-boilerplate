@@ -1,5 +1,6 @@
 import { GoogleGenerativeAI, Content, FunctionDeclaration, GenerateContentResult } from "@google/generative-ai";
 import { MCPTool } from "./mcp-client";
+import { getEnv } from "./env-init"; // Explicit env loading for Windows compatibility
 
 export interface ChatMessage {
   role: "user" | "assistant" | "system";
@@ -32,15 +33,8 @@ class GeminiAgentService {
   private chatHistory: Content[] = [];
 
   constructor() {
-    // Load API key from environment variables
-    const apiKey = process.env.GOOGLE_GENERATIVE_AI_API_KEY;
-    
-    if (!apiKey) {
-      throw new Error(
-        "GOOGLE_GENERATIVE_AI_API_KEY is not set. Please check your .env.local file."
-      );
-    }
-
+    // Load API key from environment (env-init automatically loads .env.local)
+    const apiKey = getEnv("GOOGLE_GENERATIVE_AI_API_KEY");
     this.genAI = new GoogleGenerativeAI(apiKey);
   }
 
