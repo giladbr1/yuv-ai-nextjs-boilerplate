@@ -41,11 +41,14 @@ export async function POST(request: NextRequest) {
       const toolResults = [];
       for (const toolCall of response.toolCalls) {
         try {
-          console.log(`Chat API: Executing MCP tool: ${toolCall.name}`, toolCall.args);
+          console.log(`\n[Chat API] ===== Executing MCP tool: ${toolCall.name} =====`);
+          console.log(`[Chat API] Tool args:`, JSON.stringify(toolCall.args, null, 2));
+          console.log(`[Chat API] Timestamp:`, new Date().toISOString());
           
           // Execute the MCP tool and wait for result
           const result = await mcpClient.callTool(toolCall.name, toolCall.args);
-          console.log(`Chat API: Tool ${toolCall.name} raw result:`, JSON.stringify(result).substring(0, 500));
+          console.log(`[Chat API] Tool ${toolCall.name} SUCCESS`);
+          console.log(`[Chat API] Raw result:`, JSON.stringify(result).substring(0, 500));
           
           // Extract image URL or data from result
           let mediaUrl = "";
@@ -81,11 +84,22 @@ export async function POST(request: NextRequest) {
             mediaUrl,
             mediaType,
           });
-        } catch (error) {
-          console.error(`Chat API: Error executing tool ${toolCall.name}:`, error);
+        } catch (err: any) {
+          console.error(`\n[Chat API] ===== Tool ${toolCall.name} FAILED =====`);
+          console.error(`[Chat API] Error message:`, err?.message || err);
+          console.error(`[Chat API] Error code:`, err?.code);
+          console.error(`[Chat API] Original error:`, err?.originalError);
+          console.error(`[Chat API] Tool args were:`, JSON.stringify(toolCall.args, null, 2));
+          console.error(`[Chat API] Full error object:`, JSON.stringify(err, Object.getOwnPropertyNames(err), 2).substring(0, 1000));
+          
           toolResults.push({
             name: toolCall.name,
-            error: error instanceof Error ? error.message : "Unknown error",
+            error: err instanceof Error ? err.message : String(err),
+            errorDetails: {
+              code: err?.code,
+              args: toolCall.args,
+              timestamp: new Date().toISOString()
+            }
           });
         }
       }

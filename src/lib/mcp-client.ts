@@ -241,22 +241,79 @@ class BriaMCPClient {
     return `Available MCP Tools:\n\n${toolDescriptions}`;
   }
 
-  async callTool(name: string, args: Record<string, any>): Promise<MCPToolResult> {
+  /**
+   * Call an MCP tool with automatic retry logic for transient failures
+   * @param name Tool name
+   * @param args Tool arguments
+   * @param maxRetries Maximum number of retry attempts (default: 2)
+   * @param retryDelay Initial retry delay in ms (default: 1000)
+   * @returns Tool result
+   */
+  async callTool(
+    name: string, 
+    args: Record<string, any>,
+    maxRetries: number = 2,
+    retryDelay: number = 1000
+  ): Promise<MCPToolResult> {
     if (!this.client || !this.connected) {
       throw new Error("MCP client not connected");
     }
 
-    try {
-      const response = await this.client.callTool({
-        name,
-        arguments: args,
-      });
+    let lastError: any;
+    
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      try {
+        if (attempt > 0) {
+          const delay = retryDelay * Math.pow(2, attempt - 1); // Exponential backoff
+          console.log(`[MCP] Retry attempt ${attempt}/${maxRetries} after ${delay}ms delay...`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+        }
+        
+        console.log(`[MCP] Calling tool ${name} (attempt ${attempt + 1}/${maxRetries + 1}) with args:`, JSON.stringify(args, null, 2));
+        
+        const response = await this.client.callTool({
+          name,
+          arguments: args,
+        });
 
-      return response as MCPToolResult;
-    } catch (error) {
-      console.error(`Failed to call tool ${name}:`, error);
-      throw error;
+        console.log(`[MCP] Tool ${name} SUCCESS on attempt ${attempt + 1}`);
+        console.log(`[MCP] Response:`, JSON.stringify(response, null, 2).substring(0, 500));
+        return response as MCPToolResult;
+        
+      } catch (error: any) {
+        lastError = error;
+        
+        console.error(`[MCP] Tool ${name} failed on attempt ${attempt + 1}/${maxRetries + 1}:`, {
+          error: error?.message || error,
+          code: error?.code,
+          data: error?.data,
+          stack: error?.stack?.substring(0, 500),
+          args: JSON.stringify(args, null, 2)
+        });
+        
+        // Don't retry on certain error codes (e.g., validation errors)
+        if (error?.code && [400, 401, 403, 404].includes(error.code)) {
+          console.log(`[MCP] Non-retryable error code ${error.code}, aborting retries`);
+          break;
+        }
+        
+        // If this was the last attempt, we'll throw the error below
+        if (attempt === maxRetries) {
+          console.error(`[MCP] All retry attempts exhausted for tool ${name}`);
+        }
+      }
     }
+    
+    // If we get here, all attempts failed
+    const enhancedError = new Error(
+      `MCP tool '${name}' failed after ${maxRetries + 1} attempts: ${lastError?.message || lastError}. Args: ${JSON.stringify(args)}`
+    );
+    (enhancedError as any).originalError = lastError;
+    (enhancedError as any).toolName = name;
+    (enhancedError as any).args = args;
+    (enhancedError as any).attempts = maxRetries + 1;
+    
+    throw enhancedError;
   }
 
   async disconnect(): Promise<void> {

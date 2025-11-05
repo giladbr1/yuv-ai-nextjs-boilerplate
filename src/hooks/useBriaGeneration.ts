@@ -117,8 +117,46 @@ export function useBriaGeneration(): UseBriaGenerationReturn {
           setParams((prev) => ({ ...prev, ...data.parameterUpdates }));
         }
 
-        // Execute tool calls if any
-        if (data.toolCalls && data.toolCalls.length > 0) {
+        // Handle tool results (tools are now executed by the chat API)
+        if (data.toolResults && data.toolResults.length > 0) {
+          for (const toolResult of data.toolResults) {
+            // Check if the tool execution had an error
+            if (toolResult.error) {
+              console.error(`Tool ${toolResult.name} failed:`, toolResult.error);
+              
+              // Show a more user-friendly error message
+              let errorMessage = `Failed to execute ${toolResult.name}`;
+              
+              // Check if it's a retry failure
+              if (toolResult.error.includes("failed after")) {
+                errorMessage += ". The service is experiencing issues. Please try again in a moment.";
+              } else {
+                errorMessage += `: ${toolResult.error}`;
+              }
+              
+              setError(errorMessage);
+              continue;
+            }
+
+            // Handle successful tool result - extract media
+            if (toolResult.mediaUrl) {
+              setGeneratedMedia({
+                type: toolResult.mediaType || "image",
+                url: toolResult.mediaUrl,
+              });
+
+              // Update attribution
+              if (toolResult.mediaType === "video") {
+                setAttributionAmount((prev) => prev + 0.005);
+              } else {
+                setAttributionAmount((prev) => prev + 0.001);
+              }
+            }
+          }
+        }
+
+        // Legacy support: Execute tool calls if returned separately (old pattern)
+        if (data.toolCalls && data.toolCalls.length > 0 && !data.toolResults) {
           for (const toolCall of data.toolCalls) {
             await executeToolCall(toolCall.name, toolCall.args);
           }
