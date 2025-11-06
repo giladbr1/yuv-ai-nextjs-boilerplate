@@ -1,14 +1,11 @@
 "use client";
 
-import React, { useState } from "react";
+import React from "react";
 import { BriaHeader } from "@/components/bria/BriaHeader";
-import { ChatInterface, ChatMessage } from "@/components/bria/ChatInterface";
-import { GenerationControls } from "@/components/bria/GenerationControls";
+import { LeftSidebar } from "@/components/bria/LeftSidebar";
 import { GenerationCanvas } from "@/components/bria/GenerationCanvas";
+import { GalleryBar } from "@/components/bria/GalleryBar";
 import { useBriaGeneration } from "@/hooks/useBriaGeneration";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { Send } from "lucide-react";
 import { toast } from "sonner";
 
 export default function Home() {
@@ -17,35 +14,33 @@ export default function Home() {
     params,
     attributionAmount,
     generatedMedia,
+    galleryItems,
+    activeItemId,
     isGenerating,
     error,
-    sendMessage,
+    editingState,
+    instructionsPaneState,
+    activeOperation,
+    operationLoadingName,
     updateParams,
     generate,
-    uploadImage,
+    uploadImageForReference,
+    uploadImageForDisplay,
     surpriseMe,
     clearError,
+    setActiveItem,
+    setActiveTool,
+    updateSelection,
+    updateMask,
+    addTextLayer,
+    updateTextLayer,
+    updateImageAdjustments,
+    setBrushSize,
+    clearEditingState,
+    selectOperation,
+    cancelOperation,
+    executeOneClickOperation,
   } = useBriaGeneration();
-
-  const [chatInput, setChatInput] = useState("");
-
-  const handleSendMessage = async () => {
-    if (!chatInput.trim()) return;
-
-    try {
-      await sendMessage(chatInput);
-      setChatInput("");
-    } catch (err) {
-      toast.error("Failed to send message");
-    }
-  };
-
-  const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      handleSendMessage();
-    }
-  };
 
   React.useEffect(() => {
     if (error) {
@@ -54,6 +49,22 @@ export default function Home() {
     }
   }, [error, clearError]);
 
+  // ESC key handler to close active tool or cancel operation
+  React.useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (activeOperation) {
+          cancelOperation();
+        } else if (editingState.activeTool !== 'none') {
+          setActiveTool('none');
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [editingState.activeTool, activeOperation, setActiveTool, cancelOperation]);
+
   return (
     <div className="flex flex-col h-screen overflow-hidden">
       {/* Header */}
@@ -61,53 +72,56 @@ export default function Home() {
 
       {/* Main Content */}
       <div className="flex flex-1 overflow-hidden">
-        {/* Left Sidebar - Chat & Controls */}
-        <div className="w-1/3 flex flex-col border-r bg-background">
-          {/* Chat Interface */}
-          <div className="flex-1 flex flex-col min-h-0">
-            <ChatInterface messages={messages} className="flex-1" />
-
-            {/* Chat Input */}
-            <div className="p-4 border-t bg-background">
-              <div className="flex gap-2">
-                <Input
-                  placeholder="Type a message..."
-                  value={chatInput}
-                  onChange={(e) => setChatInput(e.target.value)}
-                  onKeyPress={handleKeyPress}
-                  className="flex-1"
-                />
-                <Button
-                  size="icon"
-                  onClick={handleSendMessage}
-                  disabled={!chatInput.trim()}
-                >
-                  <Send className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
-          </div>
-
-          {/* Generation Controls */}
-          <div className="overflow-y-auto max-h-[50vh]">
-            <GenerationControls
-              params={params}
-              onParamsChange={updateParams}
-              onGenerate={generate}
-              onImageUpload={uploadImage}
-              onSurpriseMe={surpriseMe}
-              isGenerating={isGenerating}
-            />
-          </div>
+        {/* Left Sidebar - Instructions & Controls */}
+        <div className="w-1/3 border-r bg-background">
+          <LeftSidebar
+            messages={messages}
+            params={params}
+            onParamsChange={updateParams}
+            onGenerate={generate}
+            onImageUpload={uploadImageForReference}
+            onSurpriseMe={surpriseMe}
+            isGenerating={isGenerating}
+            instructionsPaneState={instructionsPaneState}
+            activeOperation={activeOperation}
+            operationLoadingName={operationLoadingName}
+            onOperationSelect={selectOperation}
+            onOperationCancel={cancelOperation}
+            onOperationExecute={executeOneClickOperation}
+          />
         </div>
 
-        {/* Right Canvas - Generation Area */}
-        <div className="flex-1 bg-muted/30">
-          <GenerationCanvas
-            generatedMedia={generatedMedia}
-            isGenerating={isGenerating}
-            onFileUpload={uploadImage}
-            className="h-full w-full"
+        {/* Right Canvas - Generation Area with Gallery */}
+        <div className="flex-1 flex flex-col bg-muted/30">
+          {/* Main Generation Display */}
+          <div className="flex-1 overflow-hidden">
+            <GenerationCanvas
+              generatedMedia={generatedMedia}
+              isGenerating={isGenerating}
+              onFileUpload={uploadImageForDisplay}
+              className="h-full w-full"
+              activeTool={editingState.activeTool}
+              selection={editingState.selection}
+              maskData={editingState.maskData}
+              textLayers={editingState.textLayers}
+              imageAdjustments={editingState.imageAdjustments}
+              brushSize={editingState.brushSize}
+              onToolChange={setActiveTool}
+              onSelectionChange={updateSelection}
+              onMaskChange={updateMask}
+              onTextLayerAdd={addTextLayer}
+              onTextLayerUpdate={updateTextLayer}
+              onImageAdjustmentsChange={updateImageAdjustments}
+              onBrushSizeChange={setBrushSize}
+              onImageAdjustmentsReset={clearEditingState}
+            />
+          </div>
+          
+          {/* Gallery Bar */}
+          <GalleryBar
+            items={galleryItems}
+            activeItemId={activeItemId}
+            onItemClick={setActiveItem}
           />
         </div>
       </div>

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { ENV, getEnv } from "@/lib/env";
+import { getEnv, hasEnv } from "@/lib/env";
 
 export async function GET() {
   return NextResponse.json({
@@ -9,19 +9,17 @@ export async function GET() {
       hasMcpUrl: !!process.env.BRIA_MCP_URL,
       hasMcpToken: !!process.env.BRIA_MCP_API_TOKEN,
     },
-    // Check hardcoded config
-    hardcodedConfig: {
-      hasGoogleKey: !!ENV.GOOGLE_GENERATIVE_AI_API_KEY,
-      hasMcpUrl: !!ENV.BRIA_MCP_URL,
-      hasMcpToken: !!ENV.BRIA_MCP_API_TOKEN,
-      mcpUrl: ENV.BRIA_MCP_URL,
-      tokenLength: ENV.BRIA_MCP_API_TOKEN.length,
+    // Check if env vars exist
+    envExists: {
+      hasGoogleKey: hasEnv("GOOGLE_GENERATIVE_AI_API_KEY"),
+      hasMcpUrl: hasEnv("BRIA_MCP_URL"),
+      hasMcpToken: hasEnv("BRIA_MCP_API_TOKEN"),
     },
     // Check final values used
     finalValues: {
-      googleKeyLength: getEnv("GOOGLE_GENERATIVE_AI_API_KEY").length,
-      mcpUrl: getEnv("BRIA_MCP_URL"),
-      mcpTokenLength: getEnv("BRIA_MCP_API_TOKEN").length,
+      googleKeyLength: hasEnv("GOOGLE_GENERATIVE_AI_API_KEY") ? getEnv("GOOGLE_GENERATIVE_AI_API_KEY").length : 0,
+      mcpUrl: hasEnv("BRIA_MCP_URL") ? getEnv("BRIA_MCP_URL") : "not set",
+      mcpTokenLength: hasEnv("BRIA_MCP_API_TOKEN") ? getEnv("BRIA_MCP_API_TOKEN").length : 0,
     },
   });
 }
