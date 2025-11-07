@@ -50,38 +50,76 @@ export async function POST(request: NextRequest) {
           console.log(`[Chat API] Tool ${toolCall.name} SUCCESS`);
           console.log(`[Chat API] Raw result:`, JSON.stringify(result).substring(0, 500));
           
-          // Extract image URL or data from result
+          // Extract image URL and structured prompt from result
           let mediaUrl = "";
+          let imageUrl = ""; // MCP-provided URL for reuse
+          let structuredPrompt = null;
           let mediaType = "image";
           
           if (result.content && result.content.length > 0) {
-            const content = result.content[0];
-            console.log(`Chat API: Content type: ${content.type}, mimeType: ${content.mimeType}`);
-            
-            // Check for image data
-            if (content.type === "image" || content.mimeType?.startsWith("image/")) {
-              const imageData = content.data || content.text || "";
-              
-              // If it's base64 data without the data URL prefix, add it
-              if (imageData && !imageData.startsWith("data:")) {
-                const mimeType = content.mimeType || "image/jpeg";
-                mediaUrl = `data:${mimeType};base64,${imageData}`;
-                console.log(`Chat API: Converted base64 to data URL (${mimeType})`);
-              } else {
-                mediaUrl = imageData;
+            // Check all content items
+            for (const content of result.content) {
+              if (content.type === "text" && content.text) {
+                // Extract image URL from "for full image Preview use: [URL]" format
+                const urlMatch = content.text.match(/for full image Preview use:\s*(https?:\/\/[^\s]+)/);
+                if (urlMatch && urlMatch[1]) {
+                  imageUrl = urlMatch[1];
+                  console.log(`Chat API: Extracted MCP image URL:`, imageUrl);
+                }
+                
+                // Extract structured prompt (JSON string)
+                // It's a complete JSON object, not embedded in text
+                try {
+                  // Try to parse the entire text as JSON
+                  const parsed = JSON.parse(content.text);
+                  if (parsed && typeof parsed === 'object' && 
+                      (parsed.short_description || parsed.objects || parsed.aesthetics)) {
+                    structuredPrompt = parsed;
+                    console.log(`Chat API: Extracted structured prompt`);
+                  }
+                } catch (e) {
+                  // Not JSON, continue
+                }
               }
-            } else if (content.type === "text" && content.text) {
-              // Some MCP servers return URL as text
-              mediaUrl = content.text;
+            }
+            
+            // Find image content for display
+            const imageContent = result.content.find((c: any) => 
+              c.type === "image" || c.mimeType?.startsWith("image/")
+            );
+            
+            if (imageContent) {
+              console.log(`Chat API: Content type: ${imageContent.type}, mimeType: ${imageContent.mimeType}`);
+              
+              // Prefer MCP URL, fall back to base64
+              if (imageUrl) {
+                mediaUrl = imageUrl;
+                console.log(`Chat API: Using MCP URL (token-efficient)`);
+              } else {
+                // Fallback to base64
+                const imageData = imageContent.data || imageContent.text || "";
+                if (imageData && !imageData.startsWith("data:")) {
+                  const mimeType = imageContent.mimeType || "image/jpeg";
+                  mediaUrl = `data:${mimeType};base64,${imageData}`;
+                  console.log(`Chat API: Using base64 (no URL available)`);
+                } else {
+                  mediaUrl = imageData;
+                }
+              }
             }
           }
           
           console.log(`Chat API: Final media URL:`, mediaUrl.substring(0, 100));
+          if (structuredPrompt) {
+            console.log(`Chat API: Structured prompt available:`, !!structuredPrompt);
+          }
           
           toolResults.push({
             name: toolCall.name,
             result,
             mediaUrl,
+            imageUrl, // Store URL separately for context reuse
+            structuredPrompt, // Store structured prompt for Priority 4
             mediaType,
           });
         } catch (err: any) {

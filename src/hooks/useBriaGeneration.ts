@@ -36,9 +36,14 @@ export interface GenerationParams {
 
 export interface GeneratedMedia {
   type: "image" | "video";
-  url: string;
+  url: string; // For display (can be base64 or URL)
+  imageUrl?: string; // MCP-provided URL for tool calls (token-efficient)
   id: string;
   timestamp: Date;
+  metadata?: {
+    structuredPrompt?: any;
+    [key: string]: any;
+  };
 }
 
 interface UseBriaGenerationReturn {
@@ -143,7 +148,7 @@ export function useBriaGeneration(): UseBriaGenerationReturn {
 
   // Send message to agent
   const sendMessage = useCallback(
-    async (message: string) => {
+    async (message: string, operationContext?: { name: string; params?: any }) => {
       if (!message.trim()) return;
 
       // Add user message
@@ -157,6 +162,27 @@ export function useBriaGeneration(): UseBriaGenerationReturn {
       setMessages((prev) => [...prev, userMessage]);
 
       try {
+        // Prepare comprehensive context object matching PRD Part 1 inputs
+        const context = {
+          user_input: message,
+          parameters: {
+            steps: params.steps,
+            model: params.model_version,
+            aspect_ratio: params.aspectRatio,
+            seed: params.seed === 'random' ? null : params.seed,
+            mode: params.mode,
+            modelInfluence: params.modelInfluence,
+          },
+          reference_image: uploadedImageContext?.url || null,
+          ai_operation: operationContext || (activeOperation ? { name: activeOperation, params: {} } : null),
+          // Use MCP URL if available (token-efficient), fallback to display URL
+          preview_image_url: generatedMedia?.imageUrl || generatedMedia?.url || null,
+          structured_prompt: generatedMedia?.metadata?.structuredPrompt || null,
+          mask_data: editingState.maskData ? exportMask()?.dataUrl || null : null,
+          // Legacy support
+          uploadedImage: uploadedImageContext,
+        };
+
         // Call agent API
         const response = await fetch("/api/chat", {
           method: "POST",
@@ -165,10 +191,7 @@ export function useBriaGeneration(): UseBriaGenerationReturn {
           },
           body: JSON.stringify({
             message,
-            currentParams: {
-              ...params,
-              uploadedImage: uploadedImageContext,
-            },
+            currentParams: context,
           }),
         });
 
@@ -216,10 +239,42 @@ export function useBriaGeneration(): UseBriaGenerationReturn {
 
             // Handle successful tool result - extract media
             if (toolResult.mediaUrl) {
-              addToGallery({
+              const newMedia = addToGallery({
                 type: toolResult.mediaType || "image",
                 url: toolResult.mediaUrl,
               });
+
+              // Store imageUrl and metadata
+              const updates: Partial<GeneratedMedia> = {};
+              
+              // Store MCP URL if available (for token-efficient context)
+              if (toolResult.imageUrl) {
+                updates.imageUrl = toolResult.imageUrl;
+              }
+              
+              // Capture metadata for Priority 4 (Conversational Refinement)
+              if (toolResult.metadata || toolResult.structuredPrompt) {
+                updates.metadata = {
+                  structuredPrompt: toolResult.structuredPrompt || toolResult.metadata?.structuredPrompt,
+                  ...toolResult.metadata,
+                };
+              }
+              
+              // Apply updates if any
+              if (Object.keys(updates).length > 0) {
+                setGalleryItems((prev) => 
+                  prev.map((item) => 
+                    item.id === newMedia.id 
+                      ? { ...item, ...updates }
+                      : item
+                  )
+                );
+                setGeneratedMedia((prev) => 
+                  prev?.id === newMedia.id 
+                    ? { ...prev, ...updates }
+                    : prev
+                );
+              }
 
               // Update attribution
               if (toolResult.mediaType === "video") {
@@ -242,7 +297,7 @@ export function useBriaGeneration(): UseBriaGenerationReturn {
         setError(err instanceof Error ? err.message : "An error occurred");
       }
     },
-    [params, uploadedImageContext, addToGallery]
+    [params, uploadedImageContext, addToGallery, activeOperation, generatedMedia, editingState]
   );
 
   // Execute MCP tool call
@@ -312,17 +367,25 @@ export function useBriaGeneration(): UseBriaGenerationReturn {
     setError(undefined);
 
     try {
-      // Prepare generic UI parameters for agent
-      // Agent will dynamically map these to correct tool parameters
-      const currentParams = {
-        prompt: params.prompt,
-        mode: params.mode,
-        model: params.model_version, // UI: model_version, agent maps to tool's "model_version" param
-        steps: params.steps,
-        aspectRatio: params.aspectRatio,
-        seed: params.seed === 'Random' ? null : params.seed,
-        modelInfluence: params.modelInfluence, // For EA tailored models
-        uploadedImage: uploadedImageContext, // Include uploaded image context for MCP
+      // Prepare comprehensive context object matching PRD Part 1 inputs
+      const context = {
+        user_input: ` ${params.prompt}`,
+        parameters: {
+          steps: params.steps,
+          model: params.model_version,
+          aspect_ratio: params.aspectRatio,
+          seed: params.seed === 'random' || params.seed === 'Random' ? null : params.seed,
+          mode: params.mode,
+          modelInfluence: params.modelInfluence,
+        },
+        reference_image: uploadedImageContext?.url || null,
+        ai_operation: null,
+        // Use MCP URL if available (token-efficient), fallback to display URL
+        preview_image_url: generatedMedia?.imageUrl || generatedMedia?.url || null,
+        structured_prompt: generatedMedia?.metadata?.structuredPrompt || null,
+        mask_data: editingState.maskData ? exportMask()?.dataUrl || null : null,
+        // Legacy support
+        uploadedImage: uploadedImageContext,
       };
 
       // Call chat API with generic params - agent handles tool selection and mapping
@@ -333,7 +396,7 @@ export function useBriaGeneration(): UseBriaGenerationReturn {
         },
         body: JSON.stringify({ 
           message: `Generate using these settings: ${params.prompt}`,
-          currentParams 
+          currentParams: context 
         }),
       });
 
@@ -353,10 +416,44 @@ export function useBriaGeneration(): UseBriaGenerationReturn {
         
         if (toolResult.mediaUrl) {
           console.log("Setting generated media with URL:", toolResult.mediaUrl.substring(0, 100));
-          addToGallery({
+          const newMedia = addToGallery({
             type: params.mode,
             url: toolResult.mediaUrl,
           });
+
+          // Store imageUrl and metadata
+          const updates: Partial<GeneratedMedia> = {};
+          
+          // Store MCP URL if available (for token-efficient context)
+          if (toolResult.imageUrl) {
+            updates.imageUrl = toolResult.imageUrl;
+            console.log("Stored MCP image URL for future context:", toolResult.imageUrl);
+          }
+          
+          // Capture metadata for Priority 4 (Conversational Refinement)
+          if (toolResult.metadata || toolResult.structuredPrompt) {
+            updates.metadata = {
+              structuredPrompt: toolResult.structuredPrompt || toolResult.metadata?.structuredPrompt,
+              ...toolResult.metadata,
+            };
+          }
+          
+          // Apply updates if any
+          if (Object.keys(updates).length > 0) {
+            setGalleryItems((prev) => 
+              prev.map((item) => 
+                item.id === newMedia.id 
+                  ? { ...item, ...updates }
+                  : item
+              )
+            );
+            setGeneratedMedia((prev) => 
+              prev?.id === newMedia.id 
+                ? { ...prev, ...updates }
+                : prev
+            );
+          }
+
           setAttributionAmount((prev) => prev + 0.001);
           
           // Add success message
@@ -398,7 +495,7 @@ export function useBriaGeneration(): UseBriaGenerationReturn {
     } finally {
       setIsGenerating(false);
     }
-  }, [params, uploadedImageContext, addToGallery]);
+  }, [params, uploadedImageContext, addToGallery, generatedMedia, editingState]);
 
   // Upload image for reference only (prompt box) - does NOT display in canvas
   const uploadImageForReference = useCallback(async (file: File) => {
@@ -696,8 +793,12 @@ export function useBriaGeneration(): UseBriaGenerationReturn {
     setError(undefined);
     
     try {
-      // Build operation message based on operation type and params
+      // Build operation message and context based on operation type and params
       let message = "";
+      let operationContext: { name: string; params?: any } = {
+        name: operation,
+        params: params || {},
+      };
       
       switch (operation) {
         case "remove-background":
@@ -712,9 +813,11 @@ export function useBriaGeneration(): UseBriaGenerationReturn {
         case "increase-resolution":
           const scale = params?.scale || 2;
           message = `Increase the resolution of the current image by ${scale}x`;
+          operationContext.params = { factor: scale };
           break;
         case "replace-background":
-          message = `Replace the background of the current image with: ${params.prompt}`;
+          message = `Replace the background of the current image with: ${params?.prompt || ""}`;
+          operationContext.params = { prompt: params?.prompt };
           break;
         case "generative-fill":
           message = "Apply generative fill to the masked area";
@@ -724,13 +827,15 @@ export function useBriaGeneration(): UseBriaGenerationReturn {
           break;
         case "expand":
           message = "Expand the image canvas";
+          operationContext.params = params || {};
           break;
         default:
           message = `Execute ${operation} operation`;
       }
       
       if (message) {
-        await sendMessage(message);
+        // Pass operation context as second argument (Priority 1: Explicit AI Operations)
+        await sendMessage(message, operationContext);
       }
       
       // Clear active operation after execution
