@@ -139,6 +139,14 @@ export function useBriaGeneration(): UseBriaGenerationReturn {
       timestamp: new Date(),
     };
     
+    console.log("➕ Adding item to gallery:");
+    console.log("  - ID:", newItem.id);
+    console.log("  - Has imageUrl:", !!newItem.imageUrl);
+    console.log("  - imageUrl:", newItem.imageUrl?.substring(0, 50));
+    console.log("  - Has metadata:", !!newItem.metadata);
+    console.log("  - Has structured prompt:", !!newItem.metadata?.structuredPrompt);
+    console.log("  - Full metadata keys:", newItem.metadata ? Object.keys(newItem.metadata) : []);
+    
     setGalleryItems((prev) => [...prev, newItem]);
     setGeneratedMedia(newItem);
     setActiveItemId(newItem.id);
@@ -182,6 +190,15 @@ export function useBriaGeneration(): UseBriaGenerationReturn {
           // Legacy support
           uploadedImage: uploadedImageContext,
         };
+        
+        // Debug logging
+        console.log("📤 Preparing context for agent:");
+        console.log("  - generatedMedia exists:", !!generatedMedia);
+        console.log("  - generatedMedia.id:", generatedMedia?.id);
+        console.log("  - generatedMedia.imageUrl:", generatedMedia?.imageUrl?.substring(0, 50));
+        console.log("  - generatedMedia.url:", generatedMedia?.url?.substring(0, 50));
+        console.log("  - Has structured prompt:", !!generatedMedia?.metadata?.structuredPrompt);
+        console.log("  - Context preview_image_url:", context.preview_image_url?.substring(0, 50));
 
         // Call agent API
         const response = await fetch("/api/chat", {
@@ -239,42 +256,29 @@ export function useBriaGeneration(): UseBriaGenerationReturn {
 
             // Handle successful tool result - extract media
             if (toolResult.mediaUrl) {
-              const newMedia = addToGallery({
+              // Prepare complete media object with all metadata upfront
+              const mediaData: Omit<GeneratedMedia, 'id' | 'timestamp'> = {
                 type: toolResult.mediaType || "image",
                 url: toolResult.mediaUrl,
-              });
-
-              // Store imageUrl and metadata
-              const updates: Partial<GeneratedMedia> = {};
+              };
               
-              // Store MCP URL if available (for token-efficient context)
+              // Add imageUrl if available (for token-efficient context)
               if (toolResult.imageUrl) {
-                updates.imageUrl = toolResult.imageUrl;
+                mediaData.imageUrl = toolResult.imageUrl;
+                console.log("Using MCP image URL for future context:", toolResult.imageUrl);
               }
               
-              // Capture metadata for Priority 4 (Conversational Refinement)
+              // Add metadata if available (for Priority 4 refinement)
               if (toolResult.metadata || toolResult.structuredPrompt) {
-                updates.metadata = {
+                mediaData.metadata = {
                   structuredPrompt: toolResult.structuredPrompt || toolResult.metadata?.structuredPrompt,
                   ...toolResult.metadata,
                 };
+                console.log("Stored structured prompt for refinement");
               }
               
-              // Apply updates if any
-              if (Object.keys(updates).length > 0) {
-                setGalleryItems((prev) => 
-                  prev.map((item) => 
-                    item.id === newMedia.id 
-                      ? { ...item, ...updates }
-                      : item
-                  )
-                );
-                setGeneratedMedia((prev) => 
-                  prev?.id === newMedia.id 
-                    ? { ...prev, ...updates }
-                    : prev
-                );
-              }
+              // Add to gallery with complete data
+              addToGallery(mediaData);
 
               // Update attribution
               if (toolResult.mediaType === "video") {
@@ -371,7 +375,7 @@ export function useBriaGeneration(): UseBriaGenerationReturn {
       const context = {
         user_input: ` ${params.prompt}`,
         parameters: {
-          steps: params.steps,
+        steps: params.steps,
           model: params.model_version,
           aspect_ratio: params.aspectRatio,
           seed: params.seed === 'random' || params.seed === 'Random' ? null : params.seed,
@@ -379,7 +383,8 @@ export function useBriaGeneration(): UseBriaGenerationReturn {
           modelInfluence: params.modelInfluence,
         },
         reference_image: uploadedImageContext?.url || null,
-        ai_operation: null,
+        // Include active operation for multi-step operations (e.g., replace-background)
+        ai_operation: activeOperation ? { name: activeOperation, params: {} } : null,
         // Use MCP URL if available (token-efficient), fallback to display URL
         preview_image_url: generatedMedia?.imageUrl || generatedMedia?.url || null,
         structured_prompt: generatedMedia?.metadata?.structuredPrompt || null,
@@ -395,7 +400,7 @@ export function useBriaGeneration(): UseBriaGenerationReturn {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({ 
-          message: `Generate using these settings: ${params.prompt}`,
+          message: ` settings: ${params.prompt}`,
           currentParams: context 
         }),
       });
@@ -416,45 +421,38 @@ export function useBriaGeneration(): UseBriaGenerationReturn {
         
         if (toolResult.mediaUrl) {
           console.log("Setting generated media with URL:", toolResult.mediaUrl.substring(0, 100));
-          const newMedia = addToGallery({
+          
+          // Prepare complete media object with all metadata upfront
+          const mediaData: Omit<GeneratedMedia, 'id' | 'timestamp'> = {
             type: params.mode,
             url: toolResult.mediaUrl,
-          });
-
-          // Store imageUrl and metadata
-          const updates: Partial<GeneratedMedia> = {};
+          };
           
-          // Store MCP URL if available (for token-efficient context)
+          // Add imageUrl if available (for token-efficient context)
           if (toolResult.imageUrl) {
-            updates.imageUrl = toolResult.imageUrl;
+            mediaData.imageUrl = toolResult.imageUrl;
             console.log("Stored MCP image URL for future context:", toolResult.imageUrl);
           }
           
-          // Capture metadata for Priority 4 (Conversational Refinement)
+          // Add metadata if available (for Priority 4 refinement)
           if (toolResult.metadata || toolResult.structuredPrompt) {
-            updates.metadata = {
+            mediaData.metadata = {
               structuredPrompt: toolResult.structuredPrompt || toolResult.metadata?.structuredPrompt,
               ...toolResult.metadata,
             };
+            console.log("Stored structured prompt for refinement");
           }
           
-          // Apply updates if any
-          if (Object.keys(updates).length > 0) {
-            setGalleryItems((prev) => 
-              prev.map((item) => 
-                item.id === newMedia.id 
-                  ? { ...item, ...updates }
-                  : item
-              )
-            );
-            setGeneratedMedia((prev) => 
-              prev?.id === newMedia.id 
-                ? { ...prev, ...updates }
-                : prev
-            );
-          }
+          // Add to gallery with complete data
+          addToGallery(mediaData);
 
           setAttributionAmount((prev) => prev + 0.001);
+          
+          // Clear active operation after successful multi-step operation
+          if (activeOperation) {
+            setActiveOperation(null);
+            setActiveTool("none");
+          }
           
           // Add success message
           const successMessage: ChatMessage = {
@@ -495,7 +493,7 @@ export function useBriaGeneration(): UseBriaGenerationReturn {
     } finally {
       setIsGenerating(false);
     }
-  }, [params, uploadedImageContext, addToGallery, generatedMedia, editingState]);
+  }, [params, uploadedImageContext, addToGallery, generatedMedia, editingState, activeOperation]);
 
   // Upload image for reference only (prompt box) - does NOT display in canvas
   const uploadImageForReference = useCallback(async (file: File) => {
@@ -748,10 +746,19 @@ export function useBriaGeneration(): UseBriaGenerationReturn {
   const setActiveItem = useCallback((id: string) => {
     const item = galleryItems.find((item) => item.id === id);
     if (item) {
+      console.log("🔄 Switching to gallery item:", id);
+      console.log("  - Item has imageUrl:", !!item.imageUrl);
+      console.log("  - Item imageUrl:", item.imageUrl?.substring(0, 50));
+      console.log("  - Item has metadata:", !!item.metadata);
+      console.log("  - Item has structured prompt:", !!item.metadata?.structuredPrompt);
+      console.log("  - Full item:", { ...item, url: item.url?.substring(0, 50) });
+      
       setGeneratedMedia(item);
       setActiveItemId(id);
       // Clear editing state when switching images
       clearEditingState();
+    } else {
+      console.warn("⚠️ Gallery item not found:", id);
     }
   }, [galleryItems, clearEditingState]);
   
@@ -878,7 +885,8 @@ export function useBriaGeneration(): UseBriaGenerationReturn {
         setParams((prev) => ({ ...prev, prompt: "expand" }));
         break;
       case "replace-background":
-        // Just set the operation, prompt will be filled by user
+        // Pre-fill prompt with instruction
+        setParams((prev) => ({ ...prev, prompt: "replace the background to " }));
         break;
       case "increase-resolution":
         // Show resolution options in the pane

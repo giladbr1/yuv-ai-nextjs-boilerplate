@@ -60,8 +60,8 @@ export async function POST(request: NextRequest) {
             // Check all content items
             for (const content of result.content) {
               if (content.type === "text" && content.text) {
-                // Extract image URL from "for full image Preview use: [URL]" format
-                const urlMatch = content.text.match(/for full image Preview use:\s*(https?:\/\/[^\s]+)/);
+                // Extract image URL from "for full image Preview use: [URL]" format (case-insensitive)
+                const urlMatch = content.text.match(/for full image Preview use:\s*(https?:\/\/[^\s]+)/i);
                 if (urlMatch && urlMatch[1]) {
                   imageUrl = urlMatch[1];
                   console.log(`Chat API: Extracted MCP image URL:`, imageUrl);

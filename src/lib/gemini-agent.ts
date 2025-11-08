@@ -127,8 +127,8 @@ DYNAMIC PARAMETER MAPPING:
 - Read each tool's parameter schema carefully
 - Map UI parameters to tool-specific parameters
 - Example mappings (always verify against tool schema):
-  * UI "steps" → tool "steps_num"
-  * UI "aspectRatio" → tool "aspect_ratio"
+     * UI "steps" → tool "steps_num"
+     * UI "aspectRatio" → tool "aspect_ratio"
 - Use tool's default values for any params not provided
 
 EXECUTION RULES:
