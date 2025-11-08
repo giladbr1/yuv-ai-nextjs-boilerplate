@@ -63,6 +63,20 @@ interface UseBriaGenerationReturn {
   activeOperation: AIOperation | null;
   operationLoadingName: string | null;
 
+  // Batch Execution State
+  batchExecution: {
+    active: boolean;
+    current: number;
+    total: number;
+    description: string;
+    steps: Array<{
+      step: number;
+      tool: string;
+      args: Record<string, any>;
+      description: string;
+    }>;
+  } | null;
+
   // Actions
   sendMessage: (message: string) => Promise<void>;
   updateParams: (newParams: Partial<GenerationParams>) => void;
@@ -130,6 +144,20 @@ export function useBriaGeneration(): UseBriaGenerationReturn {
   // Instructions Pane State
   const [activeOperation, setActiveOperation] = useState<AIOperation | null>(null);
   const [operationLoadingName, setOperationLoadingName] = useState<string | null>(null);
+
+  // Batch Execution State
+  const [batchExecution, setBatchExecution] = useState<{
+    active: boolean;
+    current: number;
+    total: number;
+    description: string;
+    steps: Array<{
+      step: number;
+      tool: string;
+      args: Record<string, any>;
+      description: string;
+    }>;
+  } | null>(null);
 
   // Helper function to add media to gallery
   const addToGallery = useCallback((media: Omit<GeneratedMedia, 'id' | 'timestamp'>) => {
@@ -240,7 +268,7 @@ export function useBriaGeneration(): UseBriaGenerationReturn {
             if (toolResult.error) {
               console.error(`Tool ${toolResult.name} failed:`, toolResult.error);
               
-              // Show a more user-friendly error message
+              // Show error and stop
               let errorMessage = `Failed to execute ${toolResult.name}`;
               
               // Check if it's a retry failure
@@ -287,6 +315,106 @@ export function useBriaGeneration(): UseBriaGenerationReturn {
                 setAttributionAmount((prev) => prev + 0.001);
               }
             }
+          }
+        }
+
+        // Handle batch execution continuation
+        if (data.execution_plan) {
+          if (data.execution_plan.continue && data.execution_plan.steps) {
+            // Store batch state with full plan
+            setBatchExecution({
+              active: true,
+              current: data.execution_plan.current,
+              total: data.execution_plan.total,
+              description: data.execution_plan.description,
+              steps: data.execution_plan.steps,
+            });
+            
+            console.log(`🔄 Starting batch execution: ${data.execution_plan.total} steps`);
+            console.log(`📋 Full plan:`, data.execution_plan.steps);
+            
+            // Execute remaining steps directly (steps 2-N)
+            for (let i = data.execution_plan.current; i < data.execution_plan.total; i++) {
+              const step = data.execution_plan.steps[i]; // steps array is 0-indexed
+              
+              console.log(`⚡ Executing step ${step.step}/${data.execution_plan.total}: ${step.description}`);
+              
+              // Update progress UI
+              setBatchExecution(prev => prev ? {...prev, current: step.step, description: step.description} : null);
+              
+              try {
+                // Call MCP tool directly
+                const toolResponse = await fetch("/api/chat", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    message: `Direct execution: ${step.tool}`,
+                    toolCalls: [{
+                      name: step.tool,
+                      args: step.args,
+                    }],
+                  }),
+                });
+                
+                if (!toolResponse.ok) {
+                  throw new Error(`Step ${step.step} failed`);
+                }
+                
+                const stepData = await toolResponse.json();
+                
+                // Handle step result
+                if (stepData.toolResults && stepData.toolResults.length > 0) {
+                  for (const toolResult of stepData.toolResults) {
+                    if (toolResult.error) {
+                      console.error(`⚠️ Step ${step.step} failed:`, toolResult.error);
+                      // Skip failed step, continue with next
+                      continue;
+                    }
+                    
+                    if (toolResult.mediaUrl) {
+                      const mediaData: Omit<GeneratedMedia, 'id' | 'timestamp'> = {
+                        type: toolResult.mediaType || "image",
+                        url: toolResult.mediaUrl,
+                      };
+                      
+                      if (toolResult.imageUrl) {
+                        mediaData.imageUrl = toolResult.imageUrl;
+                      }
+                      
+                      if (toolResult.metadata || toolResult.structuredPrompt) {
+                        mediaData.metadata = {
+                          structuredPrompt: toolResult.structuredPrompt || toolResult.metadata?.structuredPrompt,
+                          ...toolResult.metadata,
+                        };
+                      }
+                      
+                      addToGallery(mediaData);
+                      setAttributionAmount((prev) => prev + 0.001);
+                    }
+                  }
+                }
+              } catch (err) {
+                console.error(`❌ Step ${step.step} execution failed:`, err);
+                // Continue with next step
+              }
+            }
+            
+            // Batch complete
+            console.log("✅ Batch execution complete");
+            setBatchExecution(null);
+            
+            const completionMessage: ChatMessage = {
+              id: `assistant-${Date.now()}`,
+              role: "assistant",
+              content: `Batch complete! Generated ${data.execution_plan.total} images.`,
+              timestamp: new Date(),
+            };
+            setMessages((prev) => [...prev, completionMessage]);
+            
+            return; // Exit early
+          } else if (!data.execution_plan.continue) {
+            // Single step, no batch
+            setBatchExecution(null);
           }
         }
 
@@ -486,6 +614,104 @@ export function useBriaGeneration(): UseBriaGenerationReturn {
           timestamp: new Date(),
         };
         setMessages((prev) => [...prev, message]);
+      }
+
+      // Handle batch execution continuation
+      if (result.execution_plan) {
+        if (result.execution_plan.continue && result.execution_plan.steps) {
+          // Store batch state with full plan
+          setBatchExecution({
+            active: true,
+            current: result.execution_plan.current,
+            total: result.execution_plan.total,
+            description: result.execution_plan.description,
+            steps: result.execution_plan.steps,
+          });
+          
+          console.log(`🔄 Starting batch execution: ${result.execution_plan.total} steps`);
+          console.log(`📋 Full plan:`, result.execution_plan.steps);
+          
+          // Execute remaining steps directly (steps 2-N)
+          for (let i = result.execution_plan.current; i < result.execution_plan.total; i++) {
+            const step = result.execution_plan.steps[i];
+            
+            console.log(`⚡ Executing step ${step.step}/${result.execution_plan.total}: ${step.description}`);
+            
+            // Update progress UI
+            setBatchExecution(prev => prev ? {...prev, current: step.step, description: step.description} : null);
+            
+            try {
+              // Call MCP tool directly
+              const toolResponse = await fetch("/api/chat", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  message: `Direct execution: ${step.tool}`,
+                  toolCalls: [{
+                    name: step.tool,
+                    args: step.args,
+                  }],
+                }),
+              });
+              
+              if (!toolResponse.ok) {
+                throw new Error(`Step ${step.step} failed`);
+              }
+              
+              const stepData = await toolResponse.json();
+              
+              // Handle step result
+              if (stepData.toolResults && stepData.toolResults.length > 0) {
+                for (const toolResult of stepData.toolResults) {
+                  if (toolResult.error) {
+                    console.error(`⚠️ Step ${step.step} failed:`, toolResult.error);
+                    continue;
+                  }
+                  
+                  if (toolResult.mediaUrl) {
+                    const mediaData: Omit<GeneratedMedia, 'id' | 'timestamp'> = {
+                      type: toolResult.mediaType || "image",
+                      url: toolResult.mediaUrl,
+                    };
+                    
+                    if (toolResult.imageUrl) {
+                      mediaData.imageUrl = toolResult.imageUrl;
+                    }
+                    
+                    if (toolResult.metadata || toolResult.structuredPrompt) {
+                      mediaData.metadata = {
+                        structuredPrompt: toolResult.structuredPrompt || toolResult.metadata?.structuredPrompt,
+                        ...toolResult.metadata,
+                      };
+                    }
+                    
+                    addToGallery(mediaData);
+                    setAttributionAmount((prev) => prev + 0.001);
+                  }
+                }
+              }
+            } catch (err) {
+              console.error(`❌ Step ${step.step} execution failed:`, err);
+            }
+          }
+          
+          // Batch complete
+          console.log("✅ Batch execution complete");
+          setBatchExecution(null);
+          
+          const completionMessage: ChatMessage = {
+            id: `assistant-${Date.now()}`,
+            role: "assistant",
+            content: `Batch complete! Generated ${result.execution_plan.total} images.`,
+            timestamp: new Date(),
+          };
+          setMessages((prev) => [...prev, completionMessage]);
+          
+          return; // Exit early
+        } else if (!result.execution_plan.continue) {
+          // Single step, no batch
+          setBatchExecution(null);
+        }
       }
     } catch (err) {
       console.error("Error generating:", err);
@@ -918,6 +1144,7 @@ export function useBriaGeneration(): UseBriaGenerationReturn {
     instructionsPaneState,
     activeOperation,
     operationLoadingName,
+    batchExecution,
     sendMessage,
     updateParams,
     generate,

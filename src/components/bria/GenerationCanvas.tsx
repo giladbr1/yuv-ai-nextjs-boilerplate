@@ -29,6 +29,18 @@ interface GenerationCanvasProps {
     url: string;
   };
   isGenerating?: boolean;
+  batchExecution?: {
+    active: boolean;
+    current: number;
+    total: number;
+    description: string;
+    steps: Array<{
+      step: number;
+      tool: string;
+      args: Record<string, any>;
+      description: string;
+    }>;
+  } | null;
   onFileUpload?: (file: File) => void;
   className?: string;
   // Editing props
@@ -51,6 +63,7 @@ interface GenerationCanvasProps {
 export function GenerationCanvas({
   generatedMedia,
   isGenerating = false,
+  batchExecution,
   onFileUpload,
   className,
   activeTool = 'none',
@@ -176,6 +189,25 @@ export function GenerationCanvas({
           <p className="text-lg font-medium text-muted-foreground">
             Generating your creation...
           </p>
+          
+          {/* Batch Progress Indicator */}
+          {batchExecution && (
+            <div className="w-80 space-y-2 mt-4">
+              <div className="flex justify-between text-sm text-muted-foreground">
+                <span>Progress: {batchExecution.current} / {batchExecution.total}</span>
+                <span>{Math.round((batchExecution.current / batchExecution.total) * 100)}%</span>
+              </div>
+              <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
+                <div 
+                  className="h-full bg-primary transition-all duration-300"
+                  style={{width: `${(batchExecution.current / batchExecution.total) * 100}%`}}
+                />
+              </div>
+              <p className="text-sm text-muted-foreground text-center">
+                {batchExecution.description}
+              </p>
+            </div>
+          )}
         </div>
       )}
 

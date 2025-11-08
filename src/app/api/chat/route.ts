@@ -6,7 +6,7 @@ import { getMCPClient } from "@/lib/mcp-client";
 
 export async function POST(request: NextRequest) {
   try {
-    const { message, currentParams } = await request.json();
+    const { message, currentParams, toolCalls: directToolCalls } = await request.json();
 
     if (!message) {
       return NextResponse.json({ error: "Message is required" }, { status: 400 });
@@ -24,15 +24,24 @@ export async function POST(request: NextRequest) {
     }
 
     // Initialize agent with MCP tools (dynamic discovery)
-    // Agent will automatically learn tool schemas and map parameters
     const tools = mcpClient.getTools();
     console.log("Chat API: Discovered MCP tools:", tools.map(t => t.name));
     
     agent.initializeWithMCPTools(tools);
 
-    // Send message to agent with current UI parameters
-    // Agent will dynamically select correct tool and map params
-    const response = await agent.sendMessage(message, currentParams);
+    let response;
+    
+    // If direct tool calls are provided, skip agent and execute directly
+    if (directToolCalls && directToolCalls.length > 0) {
+      console.log("Chat API: Direct tool execution (bypassing agent):", directToolCalls);
+      response = {
+        message: "Direct execution",
+        toolCalls: directToolCalls,
+      };
+    } else {
+      // Send message to agent with current UI parameters
+      response = await agent.sendMessage(message, currentParams);
+    }
 
     // If the agent called tools, execute them via MCP
     if (response.toolCalls && response.toolCalls.length > 0) {
@@ -145,6 +154,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({
         ...response,
         toolResults,
+        execution_plan: response.execution_plan, // Pass through from agent
       });
     }
 

@@ -22,6 +22,7 @@ export default function Home() {
     instructionsPaneState,
     activeOperation,
     operationLoadingName,
+    batchExecution,
     updateParams,
     generate,
     uploadImageForReference,
@@ -98,6 +99,7 @@ export default function Home() {
             <GenerationCanvas
               generatedMedia={generatedMedia}
               isGenerating={isGenerating}
+              batchExecution={batchExecution}
               onFileUpload={uploadImageForDisplay}
               className="h-full w-full"
               activeTool={editingState.activeTool}
