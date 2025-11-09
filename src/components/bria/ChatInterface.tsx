@@ -45,6 +45,7 @@ function MessageBubble({ message }: MessageBubbleProps) {
   const isUser = message.role === "user";
   const isAgent = message.role === "assistant" || message.role === "system";
   const isUpdating = message.status === "updating";
+  const isError = message.isError || message.status === "error";
 
   return (
     <div
@@ -58,6 +59,8 @@ function MessageBubble({ message }: MessageBubbleProps) {
           "max-w-[85%] rounded-lg px-4 py-3 shadow-sm",
           isUser
             ? "bg-primary text-primary-foreground"
+            : isError
+            ? "bg-destructive/10 border-2 border-destructive text-destructive-foreground"
             : "bg-background border border-border"
         )}
       >

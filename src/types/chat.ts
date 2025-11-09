@@ -5,7 +5,8 @@ export interface ChatMessage {
   role: "user" | "assistant" | "system";
   content: string;
   timestamp: Date;
-  status?: "pending" | "updating" | "complete";
+  status?: "pending" | "updating" | "complete" | "error";
   agentStatus?: string; // Live updates like "Thinking of a plan", "Calling text-to-image", etc.
+  isError?: boolean; // True if this is an error message
 }
 

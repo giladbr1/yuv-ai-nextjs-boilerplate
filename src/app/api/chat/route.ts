@@ -139,9 +139,23 @@ export async function POST(request: NextRequest) {
           console.error(`[Chat API] Tool args were:`, JSON.stringify(toolCall.args, null, 2));
           console.error(`[Chat API] Full error object:`, JSON.stringify(err, Object.getOwnPropertyNames(err), 2).substring(0, 1000));
           
+          // Detect and format content moderation errors nicely
+          let errorMessage = err instanceof Error ? err.message : String(err);
+          let isContentModeration = false;
+          
+          if (errorMessage.includes("content moderation") || errorMessage.includes("422")) {
+            isContentModeration = true;
+            // Extract the actual error message if possible
+            const match = errorMessage.match(/prompt did not pass content moderation/i);
+            if (match) {
+              errorMessage = "Content Moderation: Your prompt was flagged by our content moderation system. Please try rephrasing your request to be more general or remove any potentially sensitive content.";
+            }
+          }
+          
           toolResults.push({
             name: toolCall.name,
-            error: err instanceof Error ? err.message : String(err),
+            error: errorMessage,
+            isContentModeration,
             errorDetails: {
               code: err?.code,
               args: toolCall.args,

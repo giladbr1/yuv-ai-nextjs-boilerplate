@@ -38,6 +38,7 @@ export interface GeneratedMedia {
     structuredPrompt?: any;
     [key: string]: any;
   };
+  isLoading?: boolean; // True when generation is in progress
 }
 
 interface UseBriaGenerationReturn {
@@ -156,7 +157,7 @@ export function useBriaGeneration(): UseBriaGenerationReturn {
   } | null>(null);
 
   // Helper function to add media to gallery
-  const addToGallery = useCallback((media: Omit<GeneratedMedia, 'id' | 'timestamp'>) => {
+  const addToGallery = useCallback((media: Omit<GeneratedMedia, 'id' | 'timestamp'>, replaceLoading = true) => {
     const newItem: GeneratedMedia = {
       ...media,
       id: `gallery-${Date.now()}`,
@@ -171,7 +172,22 @@ export function useBriaGeneration(): UseBriaGenerationReturn {
     console.log("  - Has structured prompt:", !!newItem.metadata?.structuredPrompt);
     console.log("  - Full metadata keys:", newItem.metadata ? Object.keys(newItem.metadata) : []);
     
-    setGalleryItems((prev) => [...prev, newItem]);
+    setGalleryItems((prev) => {
+      // If there's a loading item and we should replace it, replace it
+      if (replaceLoading) {
+        const loadingIndex = prev.findIndex(item => item.isLoading);
+        if (loadingIndex !== -1) {
+          const updated = [...prev];
+          updated[loadingIndex] = newItem;
+          console.log("  - Replaced loading placeholder");
+          return updated;
+        }
+      }
+      // Otherwise just add to the end
+      return [...prev, newItem];
+    });
+    
+    // Set as current generated media and active item (will update canvas)
     setGeneratedMedia(newItem);
     setActiveItemId(newItem.id);
     
@@ -179,7 +195,7 @@ export function useBriaGeneration(): UseBriaGenerationReturn {
   }, []);
 
   // Update the last agent message in place
-  const updateAgentMessage = useCallback((updates: Partial<Pick<ChatMessage, 'content' | 'agentStatus' | 'status'>>) => {
+  const updateAgentMessage = useCallback((updates: Partial<Pick<ChatMessage, 'content' | 'agentStatus' | 'status' | 'isError'>>) => {
     setMessages((prev) => {
       const lastMessageIndex = prev.length - 1;
       if (lastMessageIndex < 0) return prev;
@@ -202,19 +218,21 @@ export function useBriaGeneration(): UseBriaGenerationReturn {
 
   // Send message to agent
   const sendMessage = useCallback(
-    async (message: string, operationContext?: { name: string; params?: any }) => {
+    async (message: string, operationContext?: { name: string; params?: any }, skipUserMessage = false) => {
       if (!message.trim()) return;
 
-      // Add user message
-      const userMessage: ChatMessage = {
-        id: `user-${Date.now()}`,
-        role: "user",
-        content: message,
-        timestamp: new Date(),
-        status: "complete",
-      };
+      // Add user message (unless explicitly skipped - e.g., when already added by caller)
+      if (!skipUserMessage) {
+        const userMessage: ChatMessage = {
+          id: `user-${Date.now()}`,
+          role: "user",
+          content: message,
+          timestamp: new Date(),
+          status: "complete",
+        };
 
-      setMessages((prev) => [...prev, userMessage]);
+        setMessages((prev) => [...prev, userMessage]);
+      }
 
       try {
         // Prepare comprehensive context object matching PRD Part 1 inputs
@@ -305,17 +323,19 @@ export function useBriaGeneration(): UseBriaGenerationReturn {
             if (toolResult.error) {
               console.error(`Tool ${toolResult.name} failed:`, toolResult.error);
               
-              // Show error and stop
-              let errorMessage = `Failed to execute ${toolResult.name}`;
+              // Remove loading placeholder
+              setGalleryItems((prev) => prev.filter(item => !item.isLoading));
               
-              // Check if it's a retry failure
-              if (toolResult.error.includes("failed after")) {
-                errorMessage += ". The service is experiencing issues. Please try again in a moment.";
-              } else {
-                errorMessage += `: ${toolResult.error}`;
-              }
+              // Update agent message to show error
+              updateAgentMessage({
+                content: toolResult.isContentModeration 
+                  ? toolResult.error 
+                  : `Failed to execute ${toolResult.name}: ${toolResult.error}`,
+                status: "error",
+                isError: true,
+                agentStatus: undefined,
+              });
               
-              setError(errorMessage);
               continue;
             }
 
@@ -555,6 +575,17 @@ export function useBriaGeneration(): UseBriaGenerationReturn {
     };
     setMessages((prev) => [...prev, initialAgentMessage]);
 
+    // Add loading placeholder to gallery (but don't set as active - keep canvas showing current image)
+    const loadingItemId = `loading-${Date.now()}`;
+    const loadingItem: GeneratedMedia = {
+      id: loadingItemId,
+      type: params.mode,
+      url: "", // Empty URL for loading state
+      timestamp: new Date(),
+      isLoading: true,
+    };
+    setGalleryItems((prev) => [...prev, loadingItem]);
+
     try {
       // Prepare comprehensive context object matching PRD Part 1 inputs
       const context = {
@@ -655,7 +686,19 @@ export function useBriaGeneration(): UseBriaGenerationReturn {
             agentStatus: undefined,
           });
         } else if (toolResult.error) {
-          throw new Error(toolResult.error);
+          // Remove loading placeholder
+          setGalleryItems((prev) => prev.filter(item => !item.isLoading));
+          
+          // Update agent message to show error
+          updateAgentMessage({
+            content: toolResult.isContentModeration 
+              ? toolResult.error 
+              : `Failed to generate: ${toolResult.error}`,
+            status: "error",
+            isError: true,
+            agentStatus: undefined,
+          });
+          return; // Exit early
         }
       } else if (result.media) {
         // Fallback for old format
@@ -774,11 +817,22 @@ export function useBriaGeneration(): UseBriaGenerationReturn {
       }
     } catch (err) {
       console.error("Error generating:", err);
-      setError(err instanceof Error ? err.message : "Generation failed");
+      const errorMessage = err instanceof Error ? err.message : "Generation failed";
+      
+      // Update agent message to show error
+      updateAgentMessage({
+        content: `Failed to generate: ${errorMessage}`,
+        status: "error",
+        isError: true,
+        agentStatus: undefined,
+      });
+      
+      // Remove loading placeholder on error
+      setGalleryItems((prev) => prev.filter(item => !item.isLoading));
     } finally {
       setIsGenerating(false);
     }
-  }, [params, uploadedImageContext, addToGallery, generatedMedia, editingState, activeOperation]);
+  }, [params, uploadedImageContext, addToGallery, generatedMedia, editingState, activeOperation, updateAgentMessage]);
 
   // Upload image for reference only (prompt box) - does NOT display in canvas
   const uploadImageForReference = useCallback(async (file: File) => {
@@ -1074,14 +1128,14 @@ export function useBriaGeneration(): UseBriaGenerationReturn {
     
     // Set loading state
     const operationNames: Record<AIOperation, string> = {
-      "remove-background": "remove background",
-      "blur-background": "blur background",
-      "enhance-image": "enhance image",
-      "replace-background": "replace background",
-      "generative-fill": "generative fill",
-      "object-eraser": "object eraser",
-      "increase-resolution": "increase resolution",
-      "expand": "expand",
+      "remove-background": "Remove background",
+      "blur-background": "Blur background",
+      "enhance-image": "Enhance image",
+      "replace-background": "Replace background",
+      "generative-fill": "Generative fill",
+      "object-eraser": "Object eraser",
+      "increase-resolution": "Increase resolution",
+      "expand": "Expand",
     };
     
     setOperationLoadingName(operationNames[operation]);
@@ -1108,6 +1162,17 @@ export function useBriaGeneration(): UseBriaGenerationReturn {
         agentStatus: "Thinking of a plan",
       };
       setMessages((prev) => [...prev, agentMessage]);
+      
+      // Add loading placeholder to gallery (but don't set as active - keep canvas showing current image)
+      const loadingItemId = `loading-${Date.now()}`;
+      const loadingItem: GeneratedMedia = {
+        id: loadingItemId,
+        type: "image",
+        url: "", // Empty URL for loading state
+        timestamp: new Date(),
+        isLoading: true,
+      };
+      setGalleryItems((prev) => [...prev, loadingItem]);
       
       // Build operation message and context based on operation type and params
       let message = "";
@@ -1154,7 +1219,8 @@ export function useBriaGeneration(): UseBriaGenerationReturn {
         updateAgentMessage({ agentStatus: `Working on your ${operationNames[operation]} request...` });
         
         // Pass operation context as second argument (Priority 1: Explicit AI Operations)
-        await sendMessage(message, operationContext);
+        // Skip user message creation since we already created it above
+        await sendMessage(message, operationContext, true);
         
         // Note: sendMessage will update the agent message based on LLM response
         // No need to manually update here - the LLM provides personalized completion message
@@ -1170,9 +1236,13 @@ export function useBriaGeneration(): UseBriaGenerationReturn {
       // Update agent message with error
       updateAgentMessage({ 
         content: `Failed to ${operationNames[operation]}: ${err instanceof Error ? err.message : "Unknown error"}`,
-        status: "complete",
+        status: "error",
+        isError: true,
         agentStatus: undefined,
       });
+      
+      // Remove loading placeholder on error
+      setGalleryItems((prev) => prev.filter(item => !item.isLoading));
     } finally {
       setOperationLoadingName(null);
     }

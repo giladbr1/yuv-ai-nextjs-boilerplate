@@ -2,13 +2,14 @@
 
 import React from "react";
 import { cn } from "@/lib/utils";
-import { Play } from "lucide-react";
+import { Play, Loader2 } from "lucide-react";
 
 export interface GalleryItem {
   id: string;
   type: "image" | "video";
   url: string;
   timestamp: Date;
+  isLoading?: boolean;
 }
 
 interface GalleryBarProps {
@@ -53,38 +54,50 @@ export function GalleryBar({
           return (
             <button
               key={item.id}
-              onClick={() => onItemClick(item.id)}
+              onClick={() => !item.isLoading && onItemClick(item.id)}
+              disabled={item.isLoading}
               className={cn(
-                "relative flex-shrink-0 w-full aspect-square rounded-lg overflow-hidden border-2 transition-all hover:scale-105 focus:outline-none focus:ring-2 focus:ring-primary",
-                isActive
-                  ? "border-primary ring-2 ring-primary shadow-lg"
-                  : "border-muted hover:border-primary/50"
+                "relative flex-shrink-0 w-full aspect-square rounded-lg overflow-hidden border-2 transition-all focus:outline-none focus:ring-2 focus:ring-primary",
+                item.isLoading 
+                  ? "cursor-wait border-muted"
+                  : isActive
+                  ? "border-primary ring-2 ring-primary shadow-lg hover:scale-105"
+                  : "border-muted hover:border-primary/50 hover:scale-105"
               )}
-              title={`Created at ${item.timestamp.toLocaleTimeString()}`}
+              title={item.isLoading ? "Generating..." : `Created at ${item.timestamp.toLocaleTimeString()}`}
             >
-              {/* Thumbnail */}
-              {item.type === "image" ? (
-                <img
-                  src={item.url}
-                  alt="Generated content"
-                  className="w-full h-full object-cover"
-                />
-              ) : (
-                <div className="relative w-full h-full">
-                  <video
-                    src={item.url}
-                    className="w-full h-full object-cover"
-                  />
-                  {/* Video play icon overlay */}
-                  <div className="absolute inset-0 flex items-center justify-center bg-black/30">
-                    <Play className="w-6 h-6 text-white" fill="white" />
-                  </div>
+              {/* Loading state */}
+              {item.isLoading ? (
+                <div className="w-full h-full bg-muted/50 flex items-center justify-center">
+                  <Loader2 className="w-8 h-8 text-primary animate-spin" />
                 </div>
-              )}
-              
-              {/* Active indicator */}
-              {isActive && (
-                <div className="absolute inset-0 bg-primary/10 pointer-events-none" />
+              ) : (
+                <>
+                  {/* Thumbnail */}
+                  {item.type === "image" ? (
+                    <img
+                      src={item.url}
+                      alt="Generated content"
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="relative w-full h-full">
+                      <video
+                        src={item.url}
+                        className="w-full h-full object-cover"
+                      />
+                      {/* Video play icon overlay */}
+                      <div className="absolute inset-0 flex items-center justify-center bg-black/30">
+                        <Play className="w-6 h-6 text-white" fill="white" />
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* Active indicator */}
+                  {isActive && (
+                    <div className="absolute inset-0 bg-primary/10 pointer-events-none" />
+                  )}
+                </>
               )}
             </button>
           );
