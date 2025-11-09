@@ -34,6 +34,11 @@ import {
   Sliders,
   X,
   Loader2,
+  Eraser,
+  Focus,
+  Zap,
+  Maximize2,
+  ChevronDown,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { InstructionsPane } from "./InstructionsPane";
@@ -65,6 +70,7 @@ interface LeftSidebarProps {
   onSurpriseMe: () => void;
   isGenerating?: boolean;
   className?: string;
+  hasImage?: boolean;
   // Instructions Pane props
   instructionsPaneState: InstructionsPaneState;
   activeOperation: AIOperation | null;
@@ -89,6 +95,7 @@ export function LeftSidebar({
   onSurpriseMe,
   isGenerating = false,
   className,
+  hasImage = false,
   instructionsPaneState,
   activeOperation,
   operationLoadingName,
@@ -194,34 +201,20 @@ export function LeftSidebar({
 
   return (
     <div className={cn("flex flex-col h-full bg-background", className)}>
-      {/* Instructions & AI Operations Pane - Top ~2/3 */}
-      <div className="flex-[2] bg-muted/20">
-        <InstructionsPane
-          state={instructionsPaneState}
-          activeOperation={activeOperation}
-          operationLoadingName={operationLoadingName}
-          onOperationSelect={onOperationSelect}
-          onOperationCancel={onOperationCancel}
-          onOperationExecute={onOperationExecute}
-          onPromptFocus={handlePromptFocus}
-          onAspectRatioChange={handleAspectRatioChange}
-        />
-      </div>
-
-      {/* Prompt & Control Box - Bottom ~1/3 - No Scrolling */}
-      <div className="flex-[1] flex flex-col border-t">
-        <div className="flex-1 p-4 space-y-3 overflow-hidden">
+      {/* Prompt & Control Box - TOP */}
+      <div className="flex flex-col border-b">
+        <div className="p-4 space-y-3">
           {/* Prompt Input with Icons */}
           <div className="space-y-2">
             <div className="relative">
               <Textarea
                 ref={promptTextareaRef}
-                placeholder="What do you want to visualize?"
+                placeholder="What do you want to create?"
                 value={params.prompt}
                 onChange={(e) => onParamsChange({ prompt: e.target.value })}
                 onKeyDown={handleKeyDown}
                 className={cn(
-                  "min-h-[80px] pr-20 resize-none text-sm",
+                  "min-h-[120px] pr-20 resize-none text-sm",
                   uploadedImage && "pb-20"
                 )}
               />
@@ -509,8 +502,8 @@ export function LeftSidebar({
           </div>
         </div>
 
-        {/* Generate Button - Sticky at Bottom */}
-        <div className="p-4 pt-0">
+        {/* Generate Button */}
+        <div className="px-4 pb-4">
           <Button
             className="w-full"
             size="default"
@@ -530,6 +523,157 @@ export function LeftSidebar({
             )}
           </Button>
         </div>
+      </div>
+
+      {/* Quick Tools Section */}
+      <div className="border-b bg-muted/10 px-4 py-3">
+        <div className="flex items-center gap-3">
+          <p className="text-xs text-muted-foreground whitespace-nowrap">Quick AI operations</p>
+          <div className="flex items-center gap-3">
+            {/* Remove BG */}
+            <div className="relative w-8 h-8 group/tool">
+              <Button
+                variant="outline"
+                size="icon"
+                className="h-8 w-8"
+                onClick={() => onOperationExecute("remove-background")}
+                disabled={!hasImage}
+              >
+                <Eraser className="h-4 w-4" />
+              </Button>
+              <div className="absolute left-0 top-0 h-8 px-3 bg-primary text-primary-foreground rounded-md flex items-center gap-2 opacity-0 group-hover/tool:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap shadow-md z-50">
+                <Eraser className="h-4 w-4" />
+                <span className="text-xs font-medium">Remove BG</span>
+              </div>
+            </div>
+
+            {/* Blur BG */}
+            <div className="relative w-8 h-8 group/tool">
+              <Button
+                variant="outline"
+                size="icon"
+                className="h-8 w-8"
+                onClick={() => onOperationExecute("blur-background")}
+                disabled={!hasImage}
+              >
+                <Focus className="h-4 w-4" />
+              </Button>
+              <div className="absolute left-0 top-0 h-8 px-3 bg-primary text-primary-foreground rounded-md flex items-center gap-2 opacity-0 group-hover/tool:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap shadow-md z-50">
+                <Focus className="h-4 w-4" />
+                <span className="text-xs font-medium">Blur BG</span>
+              </div>
+            </div>
+
+            {/* Enhance */}
+            <div className="relative w-8 h-8 group/tool">
+              <Button
+                variant="outline"
+                size="icon"
+                className="h-8 w-8"
+                onClick={() => onOperationExecute("enhance-image")}
+                disabled={!hasImage}
+              >
+                <Sparkles className="h-4 w-4" />
+              </Button>
+              <div className="absolute left-0 top-0 h-8 px-3 bg-primary text-primary-foreground rounded-md flex items-center gap-2 opacity-0 group-hover/tool:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap shadow-md z-50">
+                <Sparkles className="h-4 w-4" />
+                <span className="text-xs font-medium">Enhance</span>
+              </div>
+            </div>
+
+            {/* Increase Resolution - with dropdown */}
+            <Popover>
+              <PopoverTrigger asChild>
+                <div className="relative w-8 h-8 group/tool">
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="h-8 w-8"
+                    disabled={!hasImage}
+                  >
+                    <Zap className="h-4 w-4" />
+                  </Button>
+                  <div className="absolute left-0 top-0 h-8 px-3 bg-primary text-primary-foreground rounded-md flex items-center gap-2 opacity-0 group-hover/tool:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap shadow-md z-50">
+                    <Zap className="h-4 w-4" />
+                    <span className="text-xs font-medium">Upscale</span>
+                  </div>
+                </div>
+              </PopoverTrigger>
+              <PopoverContent className="w-32 p-2" align="start">
+                <div className="flex flex-col gap-1">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="justify-start h-8"
+                    onClick={() => onOperationExecute("increase-resolution", { scale: 2 })}
+                  >
+                    2x
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="justify-start h-8"
+                    onClick={() => onOperationExecute("increase-resolution", { scale: 4 })}
+                  >
+                    4x
+                  </Button>
+                </div>
+              </PopoverContent>
+            </Popover>
+
+            {/* Expand - with dropdown of aspect ratios */}
+            <Popover>
+              <PopoverTrigger asChild>
+                <div className="relative w-8 h-8 group/tool">
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="h-8 w-8"
+                    disabled={!hasImage}
+                  >
+                    <Maximize2 className="h-4 w-4" />
+                  </Button>
+                  <div className="absolute left-0 top-0 h-8 px-3 bg-primary text-primary-foreground rounded-md flex items-center gap-2 opacity-0 group-hover/tool:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap shadow-md z-50">
+                    <Maximize2 className="h-4 w-4" />
+                    <span className="text-xs font-medium">Expand</span>
+                  </div>
+                </div>
+              </PopoverTrigger>
+              <PopoverContent className="w-32 p-2" align="start">
+                <div className="flex flex-col gap-1">
+                  {aspectRatios.map((ratio) => (
+                    <Button
+                      key={ratio.value}
+                      variant="ghost"
+                      size="sm"
+                      className="justify-start h-8"
+                      onClick={() => {
+                        onParamsChange({ aspectRatio: ratio.value });
+                        onOperationExecute("expand");
+                      }}
+                    >
+                      {ratio.label}
+                    </Button>
+                  ))}
+                </div>
+              </PopoverContent>
+            </Popover>
+          </div>
+        </div>
+      </div>
+
+      {/* Chat Interface - Bottom */}
+      <div className="flex-1 bg-muted/20 overflow-hidden">
+        <InstructionsPane
+          state={instructionsPaneState}
+          activeOperation={activeOperation}
+          operationLoadingName={operationLoadingName}
+          onOperationSelect={onOperationSelect}
+          onOperationCancel={onOperationCancel}
+          onOperationExecute={onOperationExecute}
+          onPromptFocus={handlePromptFocus}
+          onAspectRatioChange={handleAspectRatioChange}
+        />
       </div>
     </div>
   );

@@ -83,6 +83,7 @@ export default function Home() {
             onImageUpload={uploadImageForReference}
             onSurpriseMe={surpriseMe}
             isGenerating={isGenerating}
+            hasImage={!!generatedMedia}
             instructionsPaneState={instructionsPaneState}
             activeOperation={activeOperation}
             operationLoadingName={operationLoadingName}
@@ -93,7 +94,7 @@ export default function Home() {
         </div>
 
         {/* Right Canvas - Generation Area with Gallery */}
-        <div className="flex-1 flex flex-col bg-muted/30">
+        <div className="flex-1 flex bg-muted/30">
           {/* Main Generation Display */}
           <div className="flex-1 overflow-hidden">
             <GenerationCanvas
@@ -119,7 +120,7 @@ export default function Home() {
             />
           </div>
           
-          {/* Gallery Bar */}
+          {/* Gallery Bar - Vertical on Right */}
           <GalleryBar
             items={galleryItems}
             activeItemId={activeItemId}

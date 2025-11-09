@@ -28,12 +28,12 @@ export function GalleryBar({
     return (
       <div
         className={cn(
-          "w-full h-24 bg-background/50 border-t flex items-center justify-center",
+          "h-full w-32 bg-background/50 border-l flex items-center justify-center",
           className
         )}
       >
-        <p className="text-sm text-muted-foreground">
-          Your generation gallery will appear here
+        <p className="text-xs text-muted-foreground text-center px-2 rotate-0 writing-mode-vertical">
+          Gallery
         </p>
       </div>
     );
@@ -42,11 +42,11 @@ export function GalleryBar({
   return (
     <div
       className={cn(
-        "w-full bg-background/50 border-t overflow-hidden",
+        "h-full w-32 bg-background/50 border-l overflow-hidden flex flex-col",
         className
       )}
     >
-      <div className="flex items-center gap-3 p-3 overflow-x-auto scrollbar-thin scrollbar-thumb-muted scrollbar-track-transparent">
+      <div className="flex-1 flex flex-col gap-3 p-3 overflow-y-auto scrollbar-thin scrollbar-thumb-muted scrollbar-track-transparent">
         {items.map((item) => {
           const isActive = item.id === activeItemId;
           
@@ -55,7 +55,7 @@ export function GalleryBar({
               key={item.id}
               onClick={() => onItemClick(item.id)}
               className={cn(
-                "relative flex-shrink-0 w-20 h-20 rounded-lg overflow-hidden border-2 transition-all hover:scale-105 focus:outline-none focus:ring-2 focus:ring-primary",
+                "relative flex-shrink-0 w-full aspect-square rounded-lg overflow-hidden border-2 transition-all hover:scale-105 focus:outline-none focus:ring-2 focus:ring-primary",
                 isActive
                   ? "border-primary ring-2 ring-primary shadow-lg"
                   : "border-muted hover:border-primary/50"

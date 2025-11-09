@@ -121,7 +121,7 @@ export function useBriaGeneration(): UseBriaGenerationReturn {
     {
       id: "system-1",
       role: "system",
-      content: "what do you want to visualize?",
+      content: "what do you want to create?",
       timestamp: new Date(),
     },
   ]);
