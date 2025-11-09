@@ -85,8 +85,35 @@ export function GenerationCanvas({
   const [isHovering, setIsHovering] = useState(false);
   const [feedback, setFeedback] = useState<'up' | 'down' | null>(null);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
+  const canvasContainerRef = React.useRef<HTMLDivElement>(null);
+  const [canvasBounds, setCanvasBounds] = useState<DOMRect | null>(null);
   
   const hasEditingProps = onToolChange && onSelectionChange && onMaskChange;
+
+  // More precise hover detection for canvas
+  const handleCanvasMouseMove = useCallback((e: React.MouseEvent) => {
+    if (!canvasContainerRef.current) return;
+    
+    // Find the actual canvas element to get its precise bounds
+    const canvas = canvasContainerRef.current.querySelector('canvas');
+    if (!canvas) {
+      setIsHovering(false);
+      return;
+    }
+    
+    const canvasRect = canvas.getBoundingClientRect();
+    setCanvasBounds(canvasRect);
+    
+    const x = e.clientX;
+    const y = e.clientY;
+    
+    const isOverCanvas = x >= canvasRect.left && 
+                         x <= canvasRect.right && 
+                         y >= canvasRect.top && 
+                         y <= canvasRect.bottom;
+    
+    setIsHovering(isOverCanvas);
+  }, []);
 
   const handleDragEnter = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -291,248 +318,259 @@ export function GenerationCanvas({
           {/* Image/Video Display */}
           {generatedMedia.type === "image" && hasEditingProps ? (
             <div 
-              className="relative group flex items-center justify-center w-full h-full"
-              onMouseEnter={() => setIsHovering(true)}
+              ref={canvasContainerRef}
+              className="relative w-full h-full group"
+              onMouseMove={handleCanvasMouseMove}
               onMouseLeave={() => setIsHovering(false)}
             >
-              <div className="relative w-full h-full">
-                <ImageEditorCanvas
-                  imageUrl={generatedMedia.url}
-                  activeTool={activeTool}
-                  selection={selection}
-                  maskData={maskData}
-                  textLayers={textLayers}
-                  imageAdjustments={imageAdjustments}
-                  brushSize={brushSize}
-                  onSelectionChange={onSelectionChange}
-                  onMaskChange={onMaskChange}
-                  onTextLayerUpdate={onTextLayerUpdate!}
-                />
-            
+              <ImageEditorCanvas
+                imageUrl={generatedMedia.url}
+                activeTool={activeTool}
+                selection={selection}
+                maskData={maskData}
+                textLayers={textLayers}
+                imageAdjustments={imageAdjustments}
+                brushSize={brushSize}
+                onSelectionChange={onSelectionChange}
+                onMaskChange={onMaskChange}
+                onTextLayerUpdate={onTextLayerUpdate!}
+              />
+          
               {/* Hover Overlay with Controls */}
               <TooltipProvider delayDuration={300}>
-                <div className={cn(
-                  "absolute inset-0 transition-opacity duration-200 pointer-events-none",
-                  isHovering ? "opacity-100" : "opacity-0"
-                )}>
-                  {/* Content Credentials - Top Left */}
-                  <div className="absolute top-4 left-4 pointer-events-auto">
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button
-                          size="icon"
-                          variant="secondary"
-                          className="h-10 w-10 rounded-full bg-background/90 backdrop-blur-sm hover:bg-background shadow-lg"
-                        >
-                          <Info className="h-5 w-5" />
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent side="right">
-                        <p className="font-medium">Image created by AI using Bria.ai</p>
-                      </TooltipContent>
-                    </Tooltip>
+                {canvasBounds && (
+                  <div 
+                    className={cn(
+                      "fixed transition-opacity duration-200 pointer-events-none",
+                      isHovering ? "opacity-100" : "opacity-0"
+                    )}
+                    style={{
+                      left: canvasBounds.left,
+                      top: canvasBounds.top,
+                      width: canvasBounds.width,
+                      height: canvasBounds.height,
+                    }}
+                  >
+                    {/* Content Credentials - Top Left */}
+                    <div className="absolute top-4 left-4 pointer-events-auto">
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            size="icon"
+                            variant="secondary"
+                            className="h-10 w-10 rounded-full bg-background/90 backdrop-blur-sm hover:bg-background shadow-lg"
+                          >
+                            <Info className="h-5 w-5" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent side="right">
+                          <p className="font-medium">Image created by AI using Bria.ai</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </div>
+
+                    {/* Export and Fullscreen - Top Right */}
+                    <div className="absolute top-4 right-4 flex gap-2 pointer-events-auto">
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            size="icon"
+                            variant="secondary"
+                            className="h-10 w-10 rounded-full bg-background/90 backdrop-blur-sm hover:bg-background shadow-lg"
+                            onClick={handleExport}
+                          >
+                            <Download className="h-5 w-5" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Export</p>
+                        </TooltipContent>
+                      </Tooltip>
+
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            size="icon"
+                            variant="secondary"
+                            className="h-10 w-10 rounded-full bg-background/90 backdrop-blur-sm hover:bg-background shadow-lg"
+                            onClick={handleFullscreen}
+                          >
+                            <Maximize2 className="h-5 w-5" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Fullscreen</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </div>
+
+                    {/* Feedback - Bottom Center */}
+                    <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2 pointer-events-auto">
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            size="icon"
+                            variant={feedback === 'up' ? 'default' : 'secondary'}
+                            className={cn(
+                              "h-10 w-10 rounded-full shadow-lg transition-all",
+                              feedback === 'up' 
+                                ? "bg-primary text-primary-foreground" 
+                                : "bg-background/90 backdrop-blur-sm hover:bg-background"
+                            )}
+                            onClick={() => handleFeedback('up')}
+                          >
+                            <ThumbsUp className={cn("h-5 w-5", feedback === 'up' && "fill-current")} />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Good result</p>
+                        </TooltipContent>
+                      </Tooltip>
+
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            size="icon"
+                            variant={feedback === 'down' ? 'default' : 'secondary'}
+                            className={cn(
+                              "h-10 w-10 rounded-full shadow-lg transition-all",
+                              feedback === 'down' 
+                                ? "bg-primary text-primary-foreground" 
+                                : "bg-background/90 backdrop-blur-sm hover:bg-background"
+                            )}
+                            onClick={() => handleFeedback('down')}
+                          >
+                            <ThumbsDown className={cn("h-5 w-5", feedback === 'down' && "fill-current")} />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Poor result</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </div>
                   </div>
-
-                  {/* Export and Fullscreen - Top Right */}
-                  <div className="absolute top-4 right-4 flex gap-2 pointer-events-auto">
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button
-                          size="icon"
-                          variant="secondary"
-                          className="h-10 w-10 rounded-full bg-background/90 backdrop-blur-sm hover:bg-background shadow-lg"
-                          onClick={handleExport}
-                        >
-                          <Download className="h-5 w-5" />
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <p>Export</p>
-                      </TooltipContent>
-                    </Tooltip>
-
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button
-                          size="icon"
-                          variant="secondary"
-                          className="h-10 w-10 rounded-full bg-background/90 backdrop-blur-sm hover:bg-background shadow-lg"
-                          onClick={handleFullscreen}
-                        >
-                          <Maximize2 className="h-5 w-5" />
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <p>Fullscreen</p>
-                      </TooltipContent>
-                    </Tooltip>
-                  </div>
-
-                  {/* Feedback - Bottom Middle */}
-                  <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2 pointer-events-auto">
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button
-                          size="icon"
-                          variant={feedback === 'up' ? 'default' : 'secondary'}
-                          className={cn(
-                            "h-10 w-10 rounded-full shadow-lg transition-all",
-                            feedback === 'up' 
-                              ? "bg-primary text-primary-foreground" 
-                              : "bg-background/90 backdrop-blur-sm hover:bg-background"
-                          )}
-                          onClick={() => handleFeedback('up')}
-                        >
-                          <ThumbsUp className={cn("h-5 w-5", feedback === 'up' && "fill-current")} />
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <p>Good result</p>
-                      </TooltipContent>
-                    </Tooltip>
-
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button
-                          size="icon"
-                          variant={feedback === 'down' ? 'default' : 'secondary'}
-                          className={cn(
-                            "h-10 w-10 rounded-full shadow-lg transition-all",
-                            feedback === 'down' 
-                              ? "bg-primary text-primary-foreground" 
-                              : "bg-background/90 backdrop-blur-sm hover:bg-background"
-                          )}
-                          onClick={() => handleFeedback('down')}
-                        >
-                          <ThumbsDown className={cn("h-5 w-5", feedback === 'down' && "fill-current")} />
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <p>Poor result</p>
-                      </TooltipContent>
-                    </Tooltip>
-                  </div>
-                </div>
+                )}
               </TooltipProvider>
-              </div>
             </div>
           ) : generatedMedia.type === "image" ? (
-            <div 
-              className="relative group"
-              onMouseEnter={() => setIsHovering(true)}
-              onMouseLeave={() => setIsHovering(false)}
-            >
-              <img
-                src={generatedMedia.url}
-                alt="Generated content"
-                className="max-w-full max-h-full object-contain rounded-lg shadow-lg"
-              />
-            
-              {/* Hover Overlay with Controls */}
-              <TooltipProvider delayDuration={300}>
-                <div className={cn(
-                  "absolute inset-0 transition-opacity duration-200 pointer-events-none",
-                  isHovering ? "opacity-100" : "opacity-0"
-                )}>
-                  {/* Content Credentials - Top Left */}
-                  <div className="absolute top-4 left-4 pointer-events-auto">
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button
-                          size="icon"
-                          variant="secondary"
-                          className="h-10 w-10 rounded-full bg-background/90 backdrop-blur-sm hover:bg-background shadow-lg"
-                        >
-                          <Info className="h-5 w-5" />
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent side="right">
-                        <p className="font-medium">Image created by AI using Bria.ai</p>
-                      </TooltipContent>
-                    </Tooltip>
+            <div className="flex items-center justify-center w-full h-full">
+              <div 
+                className="relative group inline-block max-w-full max-h-full"
+                onMouseEnter={() => setIsHovering(true)}
+                onMouseLeave={() => setIsHovering(false)}
+              >
+                <img
+                  src={generatedMedia.url}
+                  alt="Generated content"
+                  className="max-w-full max-h-full object-contain rounded-lg shadow-lg"
+                />
+              
+                {/* Hover Overlay with Controls */}
+                <TooltipProvider delayDuration={300}>
+                  <div className={cn(
+                    "absolute inset-0 transition-opacity duration-200 pointer-events-none",
+                    isHovering ? "opacity-100" : "opacity-0"
+                  )}>
+                    {/* Content Credentials - Top Left */}
+                    <div className="absolute top-4 left-4 pointer-events-auto">
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            size="icon"
+                            variant="secondary"
+                            className="h-10 w-10 rounded-full bg-background/90 backdrop-blur-sm hover:bg-background shadow-lg"
+                          >
+                            <Info className="h-5 w-5" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent side="right">
+                          <p className="font-medium">Image created by AI using Bria.ai</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </div>
+
+                    {/* Export and Fullscreen - Top Right */}
+                    <div className="absolute top-4 right-4 flex gap-2 pointer-events-auto">
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            size="icon"
+                            variant="secondary"
+                            className="h-10 w-10 rounded-full bg-background/90 backdrop-blur-sm hover:bg-background shadow-lg"
+                            onClick={handleExport}
+                          >
+                            <Download className="h-5 w-5" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Export</p>
+                        </TooltipContent>
+                      </Tooltip>
+
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            size="icon"
+                            variant="secondary"
+                            className="h-10 w-10 rounded-full bg-background/90 backdrop-blur-sm hover:bg-background shadow-lg"
+                            onClick={handleFullscreen}
+                          >
+                            <Maximize2 className="h-5 w-5" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Fullscreen</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </div>
+
+                    {/* Feedback - Bottom Center */}
+                    <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2 pointer-events-auto">
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            size="icon"
+                            variant={feedback === 'up' ? 'default' : 'secondary'}
+                            className={cn(
+                              "h-10 w-10 rounded-full shadow-lg transition-all",
+                              feedback === 'up' 
+                                ? "bg-primary text-primary-foreground" 
+                                : "bg-background/90 backdrop-blur-sm hover:bg-background"
+                            )}
+                            onClick={() => handleFeedback('up')}
+                          >
+                            <ThumbsUp className={cn("h-5 w-5", feedback === 'up' && "fill-current")} />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Good result</p>
+                        </TooltipContent>
+                      </Tooltip>
+
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            size="icon"
+                            variant={feedback === 'down' ? 'default' : 'secondary'}
+                            className={cn(
+                              "h-10 w-10 rounded-full shadow-lg transition-all",
+                              feedback === 'down' 
+                                ? "bg-primary text-primary-foreground" 
+                                : "bg-background/90 backdrop-blur-sm hover:bg-background"
+                            )}
+                            onClick={() => handleFeedback('down')}
+                          >
+                            <ThumbsDown className={cn("h-5 w-5", feedback === 'down' && "fill-current")} />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Poor result</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </div>
                   </div>
-
-                  {/* Export and Fullscreen - Top Right */}
-                  <div className="absolute top-4 right-4 flex gap-2 pointer-events-auto">
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button
-                          size="icon"
-                          variant="secondary"
-                          className="h-10 w-10 rounded-full bg-background/90 backdrop-blur-sm hover:bg-background shadow-lg"
-                          onClick={handleExport}
-                        >
-                          <Download className="h-5 w-5" />
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <p>Export</p>
-                      </TooltipContent>
-                    </Tooltip>
-
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button
-                          size="icon"
-                          variant="secondary"
-                          className="h-10 w-10 rounded-full bg-background/90 backdrop-blur-sm hover:bg-background shadow-lg"
-                          onClick={handleFullscreen}
-                        >
-                          <Maximize2 className="h-5 w-5" />
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <p>Fullscreen</p>
-                      </TooltipContent>
-                    </Tooltip>
-                  </div>
-
-                  {/* Feedback - Bottom Middle */}
-                  <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2 pointer-events-auto">
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button
-                          size="icon"
-                          variant={feedback === 'up' ? 'default' : 'secondary'}
-                          className={cn(
-                            "h-10 w-10 rounded-full shadow-lg transition-all",
-                            feedback === 'up' 
-                              ? "bg-primary text-primary-foreground" 
-                              : "bg-background/90 backdrop-blur-sm hover:bg-background"
-                          )}
-                          onClick={() => handleFeedback('up')}
-                        >
-                          <ThumbsUp className={cn("h-5 w-5", feedback === 'up' && "fill-current")} />
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <p>Good result</p>
-                      </TooltipContent>
-                    </Tooltip>
-
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button
-                          size="icon"
-                          variant={feedback === 'down' ? 'default' : 'secondary'}
-                          className={cn(
-                            "h-10 w-10 rounded-full shadow-lg transition-all",
-                            feedback === 'down' 
-                              ? "bg-primary text-primary-foreground" 
-                              : "bg-background/90 backdrop-blur-sm hover:bg-background"
-                          )}
-                          onClick={() => handleFeedback('down')}
-                        >
-                          <ThumbsDown className={cn("h-5 w-5", feedback === 'down' && "fill-current")} />
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <p>Poor result</p>
-                      </TooltipContent>
-                    </Tooltip>
-                  </div>
-                </div>
-              </TooltipProvider>
+                </TooltipProvider>
+              </div>
             </div>
           ) : (
             <video
