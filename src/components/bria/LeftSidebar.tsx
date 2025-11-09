@@ -41,15 +41,9 @@ import {
   ChevronDown,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { InstructionsPane } from "./InstructionsPane";
-import type { InstructionsPaneState, AIOperation } from "@/types/instructions";
-
-export interface ChatMessage {
-  id: string;
-  role: "user" | "assistant" | "system";
-  content: string;
-  timestamp: Date;
-}
+import { ChatInterface } from "./ChatInterface";
+import type { AIOperation } from "@/types/instructions";
+import type { ChatMessage } from "@/types/chat";
 
 export interface GenerationParams {
   mode: "image" | "video";
@@ -71,8 +65,7 @@ interface LeftSidebarProps {
   isGenerating?: boolean;
   className?: string;
   hasImage?: boolean;
-  // Instructions Pane props
-  instructionsPaneState: InstructionsPaneState;
+  // Quick Tools props
   activeOperation: AIOperation | null;
   operationLoadingName: string | null;
   onOperationSelect: (operation: AIOperation) => void;
@@ -96,7 +89,6 @@ export function LeftSidebar({
   isGenerating = false,
   className,
   hasImage = false,
-  instructionsPaneState,
   activeOperation,
   operationLoadingName,
   onOperationSelect,
@@ -201,7 +193,10 @@ export function LeftSidebar({
 
   return (
     <div className={cn("flex flex-col h-full bg-background", className)}>
-      {/* Prompt & Control Box - TOP */}
+      {/* Chat Interface - TOP */}
+      <ChatInterface messages={messages} />
+
+      {/* Prompt & Control Box - MIDDLE */}
       <div className="flex flex-col border-b">
         <div className="p-4 space-y-3">
           {/* Prompt Input with Icons */}
@@ -525,7 +520,7 @@ export function LeftSidebar({
         </div>
       </div>
 
-      {/* Quick Tools Section */}
+      {/* Quick AI Operations - BOTTOM */}
       <div className="border-b bg-muted/10 px-4 py-3">
         <div className="flex items-center gap-3">
           <p className="text-xs text-muted-foreground whitespace-nowrap">Quick AI operations</p>
@@ -662,19 +657,6 @@ export function LeftSidebar({
         </div>
       </div>
 
-      {/* Chat Interface - Bottom */}
-      <div className="flex-1 bg-muted/20 overflow-hidden">
-        <InstructionsPane
-          state={instructionsPaneState}
-          activeOperation={activeOperation}
-          operationLoadingName={operationLoadingName}
-          onOperationSelect={onOperationSelect}
-          onOperationCancel={onOperationCancel}
-          onOperationExecute={onOperationExecute}
-          onPromptFocus={handlePromptFocus}
-          onAspectRatioChange={handleAspectRatioChange}
-        />
-      </div>
     </div>
   );
 }

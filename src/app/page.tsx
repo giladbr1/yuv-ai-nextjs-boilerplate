@@ -19,7 +19,6 @@ export default function Home() {
     isGenerating,
     error,
     editingState,
-    instructionsPaneState,
     activeOperation,
     operationLoadingName,
     batchExecution,
@@ -84,7 +83,6 @@ export default function Home() {
             onSurpriseMe={surpriseMe}
             isGenerating={isGenerating}
             hasImage={!!generatedMedia}
-            instructionsPaneState={instructionsPaneState}
             activeOperation={activeOperation}
             operationLoadingName={operationLoadingName}
             onOperationSelect={selectOperation}

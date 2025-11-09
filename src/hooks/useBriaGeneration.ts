@@ -16,13 +16,7 @@ import type {
   InstructionsPaneState,
   AIOperation,
 } from "@/types/instructions";
-
-export interface ChatMessage {
-  id: string;
-  role: "user" | "assistant" | "system";
-  content: string;
-  timestamp: Date;
-}
+import type { ChatMessage } from "@/types/chat";
 
 export interface GenerationParams {
   mode: "image" | "video";
@@ -79,6 +73,7 @@ interface UseBriaGenerationReturn {
 
   // Actions
   sendMessage: (message: string) => Promise<void>;
+  updateAgentMessage: (updates: Partial<Pick<ChatMessage, 'content' | 'agentStatus' | 'status'>>) => void;
   updateParams: (newParams: Partial<GenerationParams>) => void;
   generate: () => Promise<void>;
   uploadImageForReference: (file: File) => Promise<void>; // For prompt box reference only
@@ -121,8 +116,9 @@ export function useBriaGeneration(): UseBriaGenerationReturn {
     {
       id: "system-1",
       role: "system",
-      content: "what do you want to create?",
+      content: "What do you want to create?",
       timestamp: new Date(),
+      status: "complete",
     },
   ]);
 
@@ -182,6 +178,28 @@ export function useBriaGeneration(): UseBriaGenerationReturn {
     return newItem;
   }, []);
 
+  // Update the last agent message in place
+  const updateAgentMessage = useCallback((updates: Partial<Pick<ChatMessage, 'content' | 'agentStatus' | 'status'>>) => {
+    setMessages((prev) => {
+      const lastMessageIndex = prev.length - 1;
+      if (lastMessageIndex < 0) return prev;
+      
+      const lastMessage = prev[lastMessageIndex];
+      // Only update if last message is from assistant or system
+      if (lastMessage.role !== 'assistant' && lastMessage.role !== 'system') {
+        return prev;
+      }
+      
+      const updatedMessages = [...prev];
+      updatedMessages[lastMessageIndex] = {
+        ...lastMessage,
+        ...updates,
+      };
+      
+      return updatedMessages;
+    });
+  }, []);
+
   // Send message to agent
   const sendMessage = useCallback(
     async (message: string, operationContext?: { name: string; params?: any }) => {
@@ -193,6 +211,7 @@ export function useBriaGeneration(): UseBriaGenerationReturn {
         role: "user",
         content: message,
         timestamp: new Date(),
+        status: "complete",
       };
 
       setMessages((prev) => [...prev, userMessage]);
@@ -246,15 +265,33 @@ export function useBriaGeneration(): UseBriaGenerationReturn {
 
         const data = await response.json();
 
-        // Add assistant message
-        const assistantMessage: ChatMessage = {
-          id: `assistant-${Date.now()}`,
-          role: "assistant",
-          content: data.message,
-          timestamp: new Date(),
-        };
-
-        setMessages((prev) => [...prev, assistantMessage]);
+        // Update existing agent message if it exists and is in "updating" status
+        // Otherwise create a new assistant message
+        setMessages((prev) => {
+          const lastMessage = prev[prev.length - 1];
+          if (lastMessage && 
+              (lastMessage.role === "assistant" || lastMessage.role === "system") && 
+              lastMessage.status === "updating") {
+            // Update existing message
+            const updated = [...prev];
+            updated[updated.length - 1] = {
+              ...lastMessage,
+              content: data.message,
+              status: "complete",
+            };
+            return updated;
+          } else {
+            // Add new assistant message
+            const assistantMessage: ChatMessage = {
+              id: `assistant-${Date.now()}`,
+              role: "assistant",
+              content: data.message,
+              timestamp: new Date(),
+              status: "complete",
+            };
+            return [...prev, assistantMessage];
+          }
+        });
 
         // Update parameters if agent suggests changes
         if (data.parameterUpdates) {
@@ -403,13 +440,12 @@ export function useBriaGeneration(): UseBriaGenerationReturn {
             console.log("✅ Batch execution complete");
             setBatchExecution(null);
             
-            const completionMessage: ChatMessage = {
-              id: `assistant-${Date.now()}`,
-              role: "assistant",
-              content: `Batch complete! Generated ${data.execution_plan.total} images.`,
-              timestamp: new Date(),
-            };
-            setMessages((prev) => [...prev, completionMessage]);
+            // Update last agent message with completion summary
+            updateAgentMessage({
+              content: `I've created ${data.execution_plan.total} compelling variations for you!`,
+              status: "complete",
+              agentStatus: undefined,
+            });
             
             return; // Exit early
           } else if (!data.execution_plan.continue) {
@@ -498,6 +534,27 @@ export function useBriaGeneration(): UseBriaGenerationReturn {
     setIsGenerating(true);
     setError(undefined);
 
+    // Add user message with their prompt
+    const userMessage: ChatMessage = {
+      id: `user-${Date.now()}`,
+      role: "user",
+      content: params.prompt,
+      timestamp: new Date(),
+      status: "complete",
+    };
+    setMessages((prev) => [...prev, userMessage]);
+
+    // Add initial agent message (will be updated by LLM response)
+    const initialAgentMessage: ChatMessage = {
+      id: `assistant-${Date.now()}`,
+      role: "assistant",
+      content: "Working on it...",
+      timestamp: new Date(),
+      status: "updating",
+      agentStatus: "Thinking of a plan",
+    };
+    setMessages((prev) => [...prev, initialAgentMessage]);
+
     try {
       // Prepare comprehensive context object matching PRD Part 1 inputs
       const context = {
@@ -541,6 +598,16 @@ export function useBriaGeneration(): UseBriaGenerationReturn {
       console.log("Generation result:", result);
       console.log("Tool results:", result.toolResults);
 
+      // Update agent message with LLM's personalized response
+      if (result.message) {
+        updateAgentMessage({
+          content: result.message,
+          agentStatus: result.toolResults && result.toolResults.length > 0 
+            ? "Working on your request..." 
+            : undefined,
+        });
+      }
+
       // Check if we got tool results with media
       if (result.toolResults && result.toolResults.length > 0) {
         const toolResult = result.toolResults[0];
@@ -582,14 +649,11 @@ export function useBriaGeneration(): UseBriaGenerationReturn {
             setActiveTool("none");
           }
           
-          // Add success message
-          const successMessage: ChatMessage = {
-            id: `assistant-${Date.now()}`,
-            role: "assistant",
-            content: "Generation complete! Here's your creation.",
-            timestamp: new Date(),
-          };
-          setMessages((prev) => [...prev, successMessage]);
+          // Update agent message to complete
+          updateAgentMessage({
+            status: "complete",
+            agentStatus: undefined,
+          });
         } else if (toolResult.error) {
           throw new Error(toolResult.error);
         }
@@ -598,22 +662,18 @@ export function useBriaGeneration(): UseBriaGenerationReturn {
         addToGallery(result.media);
         setAttributionAmount((prev) => prev + (result.attribution || 0.001));
         
-        const successMessage: ChatMessage = {
-          id: `assistant-${Date.now()}`,
-          role: "assistant",
-          content: "Generation complete! Here's your creation.",
-          timestamp: new Date(),
-        };
-        setMessages((prev) => [...prev, successMessage]);
+        // Update agent message to complete
+        updateAgentMessage({
+          status: "complete",
+          agentStatus: undefined,
+        });
       } else {
-        // No media generated
-        const message: ChatMessage = {
-          id: `assistant-${Date.now()}`,
-          role: "assistant",
-          content: result.message || "Generation completed but no image was returned.",
-          timestamp: new Date(),
-        };
-        setMessages((prev) => [...prev, message]);
+        // No media generated - use agent's message
+        updateAgentMessage({
+          content: result.message || "I've completed the task, but no image was generated.",
+          status: "complete",
+          agentStatus: undefined,
+        });
       }
 
       // Handle batch execution continuation
@@ -695,17 +755,16 @@ export function useBriaGeneration(): UseBriaGenerationReturn {
             }
           }
           
-          // Batch complete
-          console.log("✅ Batch execution complete");
-          setBatchExecution(null);
-          
-          const completionMessage: ChatMessage = {
-            id: `assistant-${Date.now()}`,
-            role: "assistant",
-            content: `Batch complete! Generated ${result.execution_plan.total} images.`,
-            timestamp: new Date(),
-          };
-          setMessages((prev) => [...prev, completionMessage]);
+            // Batch complete
+            console.log("✅ Batch execution complete");
+            setBatchExecution(null);
+            
+            // Update the agent message with completion summary
+            updateAgentMessage({
+              content: `I've created ${result.execution_plan.total} compelling variations for you!`,
+              status: "complete",
+              agentStatus: undefined,
+            });
           
           return; // Exit early
         } else if (!result.execution_plan.continue) {
@@ -758,6 +817,7 @@ export function useBriaGeneration(): UseBriaGenerationReturn {
           ? "Reference image uploaded successfully! It will be used during generation."
           : "Reference image uploaded! You can now generate with this as context.",
         timestamp: new Date(),
+        status: "complete",
       };
       setMessages((prev) => [...prev, uploadMessage]);
     } catch (err) {
@@ -804,6 +864,7 @@ export function useBriaGeneration(): UseBriaGenerationReturn {
         role: "assistant",
         content: "Image uploaded! You can now edit it or use it as a reference.",
         timestamp: new Date(),
+        status: "complete",
       };
       setMessages((prev) => [...prev, uploadMessage]);
     } catch (err) {
@@ -836,6 +897,7 @@ export function useBriaGeneration(): UseBriaGenerationReturn {
       role: "assistant",
       content: `How about this: "${randomPrompt}"`,
       timestamp: new Date(),
+      status: "complete",
     };
     setMessages((prev) => [...prev, surpriseMessage]);
   }, []);
@@ -1012,20 +1074,41 @@ export function useBriaGeneration(): UseBriaGenerationReturn {
     
     // Set loading state
     const operationNames: Record<AIOperation, string> = {
-      "remove-background": "Remove Background",
-      "blur-background": "Blur Background",
-      "enhance-image": "Enhance Image",
-      "replace-background": "Replace Background",
-      "generative-fill": "Generative Fill",
-      "object-eraser": "Object Eraser",
-      "increase-resolution": "Increase Resolution",
-      "expand": "Expand",
+      "remove-background": "remove background",
+      "blur-background": "blur background",
+      "enhance-image": "enhance image",
+      "replace-background": "replace background",
+      "generative-fill": "generative fill",
+      "object-eraser": "object eraser",
+      "increase-resolution": "increase resolution",
+      "expand": "expand",
     };
     
     setOperationLoadingName(operationNames[operation]);
     setError(undefined);
     
     try {
+      // Add user message for the operation
+      const userMessage: ChatMessage = {
+        id: `user-${Date.now()}`,
+        role: "user",
+        content: operationNames[operation],
+        timestamp: new Date(),
+        status: "complete",
+      };
+      setMessages((prev) => [...prev, userMessage]);
+      
+      // Add initial agent message (will be updated as work progresses)
+      const agentMessage: ChatMessage = {
+        id: `assistant-${Date.now()}`,
+        role: "assistant",
+        content: "Working on it...",
+        timestamp: new Date(),
+        status: "updating",
+        agentStatus: "Thinking of a plan",
+      };
+      setMessages((prev) => [...prev, agentMessage]);
+      
       // Build operation message and context based on operation type and params
       let message = "";
       let operationContext: { name: string; params?: any } = {
@@ -1059,7 +1142,7 @@ export function useBriaGeneration(): UseBriaGenerationReturn {
           message = "Erase the masked object from the image";
           break;
         case "expand":
-          message = "Expand the image canvas";
+          message = "Expand the image";
           operationContext.params = params || {};
           break;
         default:
@@ -1067,8 +1150,14 @@ export function useBriaGeneration(): UseBriaGenerationReturn {
       }
       
       if (message) {
+        // Update agent status
+        updateAgentMessage({ agentStatus: `Working on your ${operationNames[operation]} request...` });
+        
         // Pass operation context as second argument (Priority 1: Explicit AI Operations)
         await sendMessage(message, operationContext);
+        
+        // Note: sendMessage will update the agent message based on LLM response
+        // No need to manually update here - the LLM provides personalized completion message
       }
       
       // Clear active operation after execution
@@ -1077,10 +1166,17 @@ export function useBriaGeneration(): UseBriaGenerationReturn {
     } catch (err) {
       console.error("Error executing operation:", err);
       setError(err instanceof Error ? err.message : "Operation failed");
+      
+      // Update agent message with error
+      updateAgentMessage({ 
+        content: `Failed to ${operationNames[operation]}: ${err instanceof Error ? err.message : "Unknown error"}`,
+        status: "complete",
+        agentStatus: undefined,
+      });
     } finally {
       setOperationLoadingName(null);
     }
-  }, [generatedMedia, sendMessage]);
+  }, [generatedMedia, sendMessage, updateAgentMessage]);
   
   const selectOperation = useCallback((operation: AIOperation) => {
     // One-click operations execute immediately
@@ -1146,6 +1242,7 @@ export function useBriaGeneration(): UseBriaGenerationReturn {
     operationLoadingName,
     batchExecution,
     sendMessage,
+    updateAgentMessage,
     updateParams,
     generate,
     uploadImageForReference,

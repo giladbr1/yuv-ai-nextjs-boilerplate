@@ -2,13 +2,8 @@
 
 import React, { useEffect, useRef } from "react";
 import { cn } from "@/lib/utils";
-
-export interface ChatMessage {
-  id: string;
-  role: "user" | "assistant" | "system";
-  content: string;
-  timestamp: Date;
-}
+import { Loader2 } from "lucide-react";
+import type { ChatMessage } from "@/types/chat";
 
 interface ChatInterfaceProps {
   messages: ChatMessage[];
@@ -30,34 +25,85 @@ export function ChatInterface({ messages, className }: ChatInterfaceProps) {
     <div
       ref={containerRef}
       className={cn(
-        "flex-1 overflow-y-auto space-y-4 p-4 bg-muted/20",
+        "flex-1 overflow-y-auto bg-muted/20 p-4 space-y-4",
         className
       )}
     >
       {messages.map((message) => (
-        <div
-          key={message.id}
-          className={cn(
-            "flex",
-            message.role === "user" ? "justify-end" : "justify-start"
-          )}
-        >
-          <div
-            className={cn(
-              "max-w-[80%] rounded-lg px-4 py-2 text-sm",
-              message.role === "user"
-                ? "bg-primary text-primary-foreground"
-                : message.role === "system"
-                ? "bg-muted text-muted-foreground italic"
-                : "bg-card text-card-foreground border"
-            )}
-          >
-            {message.content}
-          </div>
-        </div>
+        <MessageBubble key={message.id} message={message} />
       ))}
       <div ref={messagesEndRef} />
     </div>
   );
 }
 
+interface MessageBubbleProps {
+  message: ChatMessage;
+}
+
+function MessageBubble({ message }: MessageBubbleProps) {
+  const isUser = message.role === "user";
+  const isAgent = message.role === "assistant" || message.role === "system";
+  const isUpdating = message.status === "updating";
+
+  return (
+    <div
+      className={cn(
+        "flex w-full",
+        isUser ? "justify-end" : "justify-start"
+      )}
+    >
+      <div
+        className={cn(
+          "max-w-[85%] rounded-lg px-4 py-3 shadow-sm",
+          isUser
+            ? "bg-primary text-primary-foreground"
+            : "bg-background border border-border"
+        )}
+      >
+        {/* Message content */}
+        <p className="text-sm whitespace-pre-wrap break-words">
+          {message.content}
+        </p>
+
+        {/* Agent status indicator (for updating messages) */}
+        {isAgent && isUpdating && message.agentStatus && (
+          <div className="flex items-center gap-2 mt-2 pt-2 border-t border-border/50">
+            <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
+            <span className="text-xs text-muted-foreground italic">
+              {message.agentStatus}
+            </span>
+          </div>
+        )}
+
+        {/* Timestamp */}
+        <div
+          className={cn(
+            "text-xs mt-1 opacity-60",
+            isUser ? "text-right" : "text-left"
+          )}
+        >
+          {formatTimestamp(message.timestamp)}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function formatTimestamp(date: Date): string {
+  const now = new Date();
+  const diff = now.getTime() - date.getTime();
+  const seconds = Math.floor(diff / 1000);
+  const minutes = Math.floor(seconds / 60);
+  const hours = Math.floor(minutes / 60);
+
+  if (seconds < 60) {
+    return "just now";
+  } else if (minutes < 60) {
+    return `${minutes}m ago`;
+  } else if (hours < 24) {
+    return `${hours}h ago`;
+  } else {
+    return date.toLocaleDateString();
+  }
+}

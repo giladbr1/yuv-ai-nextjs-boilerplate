@@ -75,7 +75,7 @@ export const OPERATION_METADATA: Record<AIOperation, OperationMetadata> = {
   "expand": {
     name: "expand",
     displayName: "Expand",
-    description: "Expand the image canvas",
+    description: "Expand the image",
     isMultiStep: true,
     mcpToolName: "expand",
   },
