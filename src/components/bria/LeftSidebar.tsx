@@ -41,6 +41,9 @@ interface LeftSidebarProps {
   onSurpriseMe: () => void;
   isGenerating?: boolean;
   className?: string;
+  customPlaceholder?: string;
+  shouldFocusPrompt?: boolean;
+  onPromptFocused?: () => void;
 }
 
 const aspectRatios = [
@@ -58,6 +61,9 @@ export function LeftSidebar({
   onSurpriseMe,
   isGenerating = false,
   className,
+  customPlaceholder,
+  shouldFocusPrompt = false,
+  onPromptFocused,
 }: LeftSidebarProps) {
   const [uploadedImage, setUploadedImage] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
@@ -81,6 +87,21 @@ export function LeftSidebar({
       }
     };
   }, [uploadedImage]);
+
+  // Focus prompt when requested (e.g., for fill inpainting)
+  useEffect(() => {
+    if (shouldFocusPrompt && promptTextareaRef.current) {
+      promptTextareaRef.current.focus();
+      // Add a pulsing animation class
+      promptTextareaRef.current.classList.add('animate-pulse');
+      setTimeout(() => {
+        promptTextareaRef.current?.classList.remove('animate-pulse');
+      }, 1000);
+      if (onPromptFocused) {
+        onPromptFocused();
+      }
+    }
+  }, [shouldFocusPrompt, onPromptFocused]);
 
   const handleImageUploadClick = () => {
     fileInputRef.current?.click();
@@ -151,7 +172,7 @@ export function LeftSidebar({
             <div className="relative">
               <Textarea
                 ref={promptTextareaRef}
-                placeholder="What do you want to create?"
+                placeholder={customPlaceholder || "What do you want to create?"}
                 value={params.prompt}
                 onChange={(e) => onParamsChange({ prompt: e.target.value })}
                 onKeyDown={handleKeyDown}

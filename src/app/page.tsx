@@ -39,7 +39,12 @@ export default function Home() {
     selectOperation,
     cancelOperation,
     executeOneClickOperation,
+    setInpaintingMask,
   } = useBriaGeneration();
+
+  // Inpainting state
+  const [shouldFocusPrompt, setShouldFocusPrompt] = React.useState(false);
+  const [customPlaceholder, setCustomPlaceholder] = React.useState<string>();
 
   React.useEffect(() => {
     if (error) {
@@ -86,6 +91,12 @@ export default function Home() {
             onImageUpload={uploadImageForReference}
             onSurpriseMe={surpriseMe}
             isGenerating={isGenerating}
+            customPlaceholder={customPlaceholder}
+            shouldFocusPrompt={shouldFocusPrompt}
+            onPromptFocused={() => {
+              setShouldFocusPrompt(false);
+              setCustomPlaceholder(undefined);
+            }}
           />
         </div>
 
@@ -102,6 +113,13 @@ export default function Home() {
               hasImage={!!generatedMedia}
               onOperationExecute={executeOneClickOperation}
               onAspectRatioChange={(aspectRatio) => updateParams({ aspectRatio })}
+              onPromptFocus={() => {
+                setCustomPlaceholder("What do you want in the masked area?");
+                setShouldFocusPrompt(true);
+              }}
+              onFillMask={(maskBase64) => {
+                setInpaintingMask(maskBase64);
+              }}
             />
           </div>
           

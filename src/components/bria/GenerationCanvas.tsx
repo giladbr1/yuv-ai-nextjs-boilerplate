@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useCallback, useRef, useEffect } from "react";
-import { Upload, Loader2, ThumbsUp, ThumbsDown, Maximize2, Download, Info, Eraser, Focus, Sparkles, Zap } from "lucide-react";
+import { Upload, Loader2, ThumbsUp, ThumbsDown, Maximize2, Download, Info, Eraser, Focus, Sparkles, Zap, Paintbrush, Trash2, Wand2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   Tooltip,
@@ -43,6 +43,9 @@ interface GenerationCanvasProps {
   hasImage?: boolean;
   onOperationExecute?: (operation: AIOperation, params?: any) => void;
   onAspectRatioChange?: (aspectRatio: string) => void;
+  // Inpainting props
+  onPromptFocus?: () => void;
+  onFillMask?: (maskBase64: string) => void;
 }
 
 const aspectRatios = [
@@ -60,11 +63,23 @@ export function GenerationCanvas({
   hasImage = false,
   onOperationExecute,
   onAspectRatioChange,
+  onPromptFocus,
+  onFillMask,
 }: GenerationCanvasProps) {
   // File upload states
   const [isDragging, setIsDragging] = useState(false);
   const [feedback, setFeedback] = useState<'up' | 'down' | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  
+  // Inpainting states
+  const [isInpaintingActive, setIsInpaintingActive] = useState(false);
+  const [brushSize, setBrushSize] = useState(50);
+  const [isDrawing, setIsDrawing] = useState(false);
+  const [lastDrawPosition, setLastDrawPosition] = useState<{ x: number; y: number } | null>(null);
+  const [showMaskMenu, setShowMaskMenu] = useState(false);
+  const [maskMenuPosition, setMaskMenuPosition] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+  const maskCanvasRef = useRef<HTMLCanvasElement>(null);
+  const menuTimerRef = useRef<NodeJS.Timeout | null>(null);
   
   // Pan and zoom states
   const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
@@ -271,6 +286,113 @@ export function GenerationCanvas({
     document.body.removeChild(link);
   }, [generatedMedia]);
 
+  // Inpainting mask drawing handlers
+  const startMaskDrawing = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
+    if (!isInpaintingActive || !maskCanvasRef.current) return;
+    
+    // Clear any existing menu timer
+    if (menuTimerRef.current) {
+      clearTimeout(menuTimerRef.current);
+      menuTimerRef.current = null;
+    }
+    setShowMaskMenu(false);
+    
+    const canvas = maskCanvasRef.current;
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    
+    setIsDrawing(true);
+    setLastDrawPosition({ x, y });
+    
+    // Start drawing at this point
+    const ctx = canvas.getContext('2d');
+    if (ctx) {
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+    }
+  }, [isInpaintingActive]);
+
+  const drawMask = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
+    if (!isDrawing || !maskCanvasRef.current || !lastDrawPosition) return;
+    
+    const canvas = maskCanvasRef.current;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    
+    ctx.globalCompositeOperation = "source-over";
+    ctx.lineWidth = brushSize;
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    ctx.strokeStyle = "#8800FF";
+    
+    ctx.moveTo(lastDrawPosition.x, lastDrawPosition.y);
+    ctx.lineTo(x, y);
+    ctx.stroke();
+    
+    setLastDrawPosition({ x, y });
+  }, [isDrawing, lastDrawPosition, brushSize]);
+
+  const stopMaskDrawing = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
+    if (!isDrawing) return;
+    
+    setIsDrawing(false);
+    setLastDrawPosition(null);
+    
+    const canvas = maskCanvasRef.current;
+    if (!canvas) return;
+    
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    
+    // Store menu position near the last draw position
+    setMaskMenuPosition({ x: e.clientX, y: e.clientY });
+    
+    // Start 1-second timer to show menu
+    menuTimerRef.current = setTimeout(() => {
+      setShowMaskMenu(true);
+    }, 1000);
+  }, [isDrawing]);
+
+  // Extract mask as base64
+  const extractMask = useCallback((): string | null => {
+    if (!maskCanvasRef.current) return null;
+    
+    const canvas = maskCanvasRef.current;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return null;
+    
+    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const maskCanvas = document.createElement('canvas');
+    const maskContext = maskCanvas.getContext('2d');
+    if (!maskContext) return null;
+    
+    maskCanvas.width = canvas.width;
+    maskCanvas.height = canvas.height;
+    
+    // Convert drawn pixels to white (255), empty to black (0)
+    for (let i = 0; i < imageData.data.length; i += 4) {
+      const isFilled = imageData.data[i + 3] !== 0;
+      const maskValue = isFilled ? 255 : 0;
+      
+      imageData.data[i] = maskValue;
+      imageData.data[i + 1] = maskValue;
+      imageData.data[i + 2] = maskValue;
+      imageData.data[i + 3] = 255;
+    }
+    
+    maskContext.putImageData(imageData, 0, 0);
+    
+    const dataUrl = maskCanvas.toDataURL('image/png');
+    const commaIdx = dataUrl.indexOf(',');
+    return commaIdx !== -1 ? dataUrl.slice(commaIdx + 1) : dataUrl;
+  }, []);
+
   return (
     <div
       ref={canvasRef}
@@ -354,6 +476,29 @@ export function GenerationCanvas({
                 </TooltipTrigger>
                 <TooltipContent>
                   <p>Enhance Image</p>
+                </TooltipContent>
+              </Tooltip>
+
+              <div className="w-px h-4 bg-neutral-200" />
+
+              {/* Inpainting */}
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className={cn(
+                      "h-7 w-7 rounded-full hover:bg-neutral-100 disabled:opacity-40",
+                      isInpaintingActive && "bg-primary text-primary-foreground hover:bg-primary/90"
+                    )}
+                    onClick={() => setIsInpaintingActive(!isInpaintingActive)}
+                    disabled={!hasImage}
+                  >
+                    <Paintbrush className="h-3.5 w-3.5" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Inpainting</p>
                 </TooltipContent>
               </Tooltip>
 
@@ -566,7 +711,36 @@ export function GenerationCanvas({
                     maxHeight: '60vh',
                   }}
                   draggable={false}
+                  onLoad={(e) => {
+                    // Sync mask canvas size with image
+                    if (isInpaintingActive && maskCanvasRef.current) {
+                      const img = e.currentTarget;
+                      maskCanvasRef.current.width = img.clientWidth;
+                      maskCanvasRef.current.height = img.clientHeight;
+                    }
+                  }}
                 />
+
+                {/* Mask Canvas Overlay for Inpainting */}
+                {isInpaintingActive && (
+                  <canvas
+                    ref={maskCanvasRef}
+                    className="absolute top-0 left-0 rounded-lg cursor-crosshair"
+                    style={{
+                      opacity: 0.6,
+                      pointerEvents: 'auto',
+                    }}
+                    onMouseDown={startMaskDrawing}
+                    onMouseMove={drawMask}
+                    onMouseUp={stopMaskDrawing}
+                    onMouseLeave={() => {
+                      if (isDrawing) {
+                        setIsDrawing(false);
+                        setLastDrawPosition(null);
+                      }
+                    }}
+                  />
+                )}
 
                 {/* Toolbar - Top Right corner of image, only visible when fully zoomed out */}
                 {zoom === 1 && (
@@ -689,6 +863,99 @@ export function GenerationCanvas({
       {/* Drag Overlay */}
       {isDragging && (
         <div className="absolute inset-0 bg-primary/5 border-4 border-dashed border-primary pointer-events-none" />
+      )}
+
+      {/* Mask Action Menu - Appears after drawing */}
+      {showMaskMenu && isInpaintingActive && (
+        <div 
+          className="absolute z-50"
+          style={{
+            left: `${maskMenuPosition.x}px`,
+            top: `${maskMenuPosition.y + 10}px`,
+            transform: 'translate(-50%, 0)',
+          }}
+        >
+          <div className="flex items-center gap-2 bg-white/95 backdrop-blur-md rounded-full px-3 py-2 shadow-lg border border-neutral-200/50">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-8 gap-2 hover:bg-neutral-100"
+              onClick={() => {
+                const maskBase64 = extractMask();
+                if (maskBase64 && onOperationExecute) {
+                  onOperationExecute("object-eraser", { mask: maskBase64 });
+                  // Clear mask and exit inpainting mode
+                  if (maskCanvasRef.current) {
+                    const ctx = maskCanvasRef.current.getContext('2d');
+                    if (ctx) {
+                      ctx.clearRect(0, 0, maskCanvasRef.current.width, maskCanvasRef.current.height);
+                    }
+                  }
+                  setIsInpaintingActive(false);
+                  setShowMaskMenu(false);
+                }
+              }}
+            >
+              <Trash2 className="h-4 w-4" />
+              <span className="text-sm font-medium">Erase</span>
+            </Button>
+            <div className="w-px h-6 bg-neutral-200" />
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-8 gap-2 hover:bg-neutral-100"
+              onClick={() => {
+                const maskBase64 = extractMask();
+                if (maskBase64) {
+                  // Store mask data via callback
+                  if (onFillMask) {
+                    onFillMask(maskBase64);
+                  }
+                  // Exit inpainting mode
+                  setIsInpaintingActive(false);
+                  setShowMaskMenu(false);
+                  // Clear mask canvas
+                  if (maskCanvasRef.current) {
+                    const ctx = maskCanvasRef.current.getContext('2d');
+                    if (ctx) {
+                      ctx.clearRect(0, 0, maskCanvasRef.current.width, maskCanvasRef.current.height);
+                    }
+                  }
+                  // Focus prompt
+                  if (onPromptFocus) {
+                    onPromptFocus();
+                  }
+                }
+              }}
+            >
+              <Wand2 className="h-4 w-4" />
+              <span className="text-sm font-medium">Fill</span>
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* Brush Size Slider - Sticky Bottom */}
+      {isInpaintingActive && (
+        <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-40">
+          <div className="flex items-center gap-3 bg-white/95 backdrop-blur-md rounded-full px-4 py-2 shadow-lg border border-neutral-200/50">
+            <label htmlFor="brush-size" className="text-sm font-medium text-neutral-700 whitespace-nowrap">
+              Brush Size:
+            </label>
+            <input
+              id="brush-size"
+              type="range"
+              min="1"
+              max="100"
+              value={brushSize}
+              onChange={(e) => setBrushSize(Number(e.target.value))}
+              className="w-32 h-1 bg-neutral-200 rounded-lg appearance-none cursor-pointer accent-primary"
+            />
+            <span className="text-sm font-medium text-neutral-700 w-8 text-right">
+              {brushSize}
+            </span>
+          </div>
+        </div>
       )}
     </div>
   );

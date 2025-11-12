@@ -12,7 +12,8 @@ export type AIOperation =
   | "generative-fill"
   | "object-eraser"
   | "increase-resolution"
-  | "expand";
+  | "expand"
+  | "inpainting";
 
 export interface OperationMetadata {
   name: string;
@@ -78,6 +79,12 @@ export const OPERATION_METADATA: Record<AIOperation, OperationMetadata> = {
     description: "Expand the image",
     isMultiStep: true,
     mcpToolName: "expand",
+  },
+  "inpainting": {
+    name: "inpainting",
+    displayName: "Inpainting",
+    description: "Draw a mask to erase objects or fill with AI-generated content",
+    isMultiStep: true,
   },
 };
 

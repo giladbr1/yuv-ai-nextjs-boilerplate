@@ -99,6 +99,9 @@ interface UseBriaGenerationReturn {
   selectOperation: (operation: AIOperation) => void;
   cancelOperation: () => void;
   executeOneClickOperation: (operation: AIOperation) => Promise<void>;
+  
+  // Inpainting Actions
+  setInpaintingMask: (maskBase64: string) => void;
 }
 
 const DEFAULT_PARAMS: GenerationParams = {
@@ -136,6 +139,9 @@ export function useBriaGeneration(): UseBriaGenerationReturn {
   } | null>(null);
   const [editingState, setEditingState] = useState<EditingState>(DEFAULT_STATE);
   const [imageElement, setImageElement] = useState<HTMLImageElement | null>(null);
+  
+  // Inpainting State
+  const [inpaintingMaskBase64, setInpaintingMaskBase64] = useState<string | null>(null);
   
   // Instructions Pane State
   const [activeOperation, setActiveOperation] = useState<AIOperation | null>(null);
@@ -285,7 +291,10 @@ export function useBriaGeneration(): UseBriaGenerationReturn {
           // Use MCP URL if available (token-efficient), fallback to display URL
           preview_image_url: generatedMedia?.imageUrl || generatedMedia?.url || null,
           structured_prompt: generatedMedia?.metadata?.structuredPrompt || null,
-          mask_data: editingState.maskData ? exportMask()?.dataUrl || null : null,
+          // Use inpainting mask if available, otherwise use editingState mask
+          mask_data: inpaintingMaskBase64 
+            ? `data:image/png;base64,${inpaintingMaskBase64}`
+            : (editingState.maskData ? exportMask()?.dataUrl || null : null),
           // Legacy support
           uploadedImage: uploadedImageContext,
         };
@@ -518,8 +527,13 @@ export function useBriaGeneration(): UseBriaGenerationReturn {
         console.error("Error sending message:", err);
         setError(err instanceof Error ? err.message : "An error occurred");
       }
+      
+      // Clear inpainting mask after use
+      if (inpaintingMaskBase64) {
+        setInpaintingMaskBase64(null);
+      }
     },
-    [params, uploadedImageContext, addToGallery, activeOperation, generatedMedia, editingState]
+    [params, uploadedImageContext, addToGallery, activeOperation, generatedMedia, editingState, inpaintingMaskBase64]
   );
 
   // Execute MCP tool call
@@ -638,7 +652,10 @@ export function useBriaGeneration(): UseBriaGenerationReturn {
         // Use MCP URL if available (token-efficient), fallback to display URL
         preview_image_url: generatedMedia?.imageUrl || generatedMedia?.url || null,
         structured_prompt: generatedMedia?.metadata?.structuredPrompt || null,
-        mask_data: editingState.maskData ? exportMask()?.dataUrl || null : null,
+        // Use inpainting mask if available, otherwise use editingState mask
+        mask_data: inpaintingMaskBase64 
+          ? `data:image/png;base64,${inpaintingMaskBase64}`
+          : (editingState.maskData ? exportMask()?.dataUrl || null : null),
         // Legacy support
         uploadedImage: uploadedImageContext,
       };
@@ -865,8 +882,12 @@ export function useBriaGeneration(): UseBriaGenerationReturn {
       setGalleryItems((prev) => prev.filter(item => !item.isLoading));
     } finally {
       setIsGenerating(false);
+      // Clear inpainting mask after generation attempt
+      if (inpaintingMaskBase64) {
+        setInpaintingMaskBase64(null);
+      }
     }
-  }, [params, uploadedImageContext, addToGallery, generatedMedia, editingState, activeOperation, updateAgentMessage]);
+  }, [params, uploadedImageContext, addToGallery, generatedMedia, editingState, activeOperation, updateAgentMessage, inpaintingMaskBase64]);
 
   // Upload image for reference only (prompt box) - does NOT display in canvas
   const uploadImageForReference = useCallback(async (file: File) => {
@@ -1331,6 +1352,10 @@ export function useBriaGeneration(): UseBriaGenerationReturn {
     setParams((prev) => ({ ...prev, prompt: "" }));
   }, []);
 
+  const setInpaintingMask = useCallback((maskBase64: string) => {
+    setInpaintingMaskBase64(maskBase64);
+  }, []);
+
   return {
     messages,
     params,
@@ -1367,6 +1392,7 @@ export function useBriaGeneration(): UseBriaGenerationReturn {
     selectOperation,
     cancelOperation,
     executeOneClickOperation,
+    setInpaintingMask,
   };
 }
 
