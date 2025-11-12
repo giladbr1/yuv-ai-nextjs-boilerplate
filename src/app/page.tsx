@@ -105,20 +105,6 @@ export default function Home() {
               batchExecution={batchExecution}
               onFileUpload={uploadImageForDisplay}
               className="h-full w-full"
-              activeTool={editingState.activeTool}
-              selection={editingState.selection}
-              maskData={editingState.maskData}
-              textLayers={editingState.textLayers}
-              imageAdjustments={editingState.imageAdjustments}
-              brushSize={editingState.brushSize}
-              onToolChange={setActiveTool}
-              onSelectionChange={updateSelection}
-              onMaskChange={updateMask}
-              onTextLayerAdd={addTextLayer}
-              onTextLayerUpdate={updateTextLayer}
-              onImageAdjustmentsChange={updateImageAdjustments}
-              onBrushSizeChange={setBrushSize}
-              onImageAdjustmentsReset={clearEditingState}
             />
           </div>
           

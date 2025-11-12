@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useRef, useEffect } from "react";
 import { Upload, Loader2, ThumbsUp, ThumbsDown, Maximize2, Download, Info } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -10,18 +10,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { Button } from "@/components/ui/button";
-import type {
-  EditingTool,
-  SelectionRect,
-  TextLayer,
-  ImageAdjustments as ImageAdjustmentsType,
-} from "@/types/editing";
-import { ImageEditorCanvas } from "./ImageEditorCanvas";
-import { EditingToolbar } from "./EditingToolbar";
-import { BrushSizeControl } from "./BrushSizeControl";
-import { TextEditor } from "./TextEditor";
-import { ImageAdjustments } from "./ImageAdjustments";
-import { DEFAULT_IMAGE_ADJUSTMENTS } from "@/types/editing";
+import { DotPattern } from "@/components/ui/dot-pattern";
 
 interface GenerationCanvasProps {
   generatedMedia?: {
@@ -43,21 +32,6 @@ interface GenerationCanvasProps {
   } | null;
   onFileUpload?: (file: File) => void;
   className?: string;
-  // Editing props
-  activeTool?: EditingTool;
-  selection?: SelectionRect | null;
-  maskData?: ImageData | null;
-  textLayers?: TextLayer[];
-  imageAdjustments?: ImageAdjustmentsType;
-  brushSize?: number;
-  onToolChange?: (tool: EditingTool) => void;
-  onSelectionChange?: (rect: SelectionRect | null) => void;
-  onMaskChange?: (imageData: ImageData | null) => void;
-  onTextLayerAdd?: (layer: Omit<TextLayer, 'id'>) => void;
-  onTextLayerUpdate?: (id: string, updates: Partial<TextLayer>) => void;
-  onImageAdjustmentsChange?: (adjustments: Partial<ImageAdjustmentsType>) => void;
-  onBrushSizeChange?: (size: number) => void;
-  onImageAdjustmentsReset?: () => void;
 }
 
 export function GenerationCanvas({
@@ -66,54 +40,133 @@ export function GenerationCanvas({
   batchExecution,
   onFileUpload,
   className,
-  activeTool = 'none',
-  selection = null,
-  maskData = null,
-  textLayers = [],
-  imageAdjustments = DEFAULT_IMAGE_ADJUSTMENTS,
-  brushSize = 30,
-  onToolChange,
-  onSelectionChange,
-  onMaskChange,
-  onTextLayerAdd,
-  onTextLayerUpdate,
-  onImageAdjustmentsChange,
-  onBrushSizeChange,
-  onImageAdjustmentsReset,
 }: GenerationCanvasProps) {
+  // File upload states
   const [isDragging, setIsDragging] = useState(false);
-  const [isHovering, setIsHovering] = useState(false);
   const [feedback, setFeedback] = useState<'up' | 'down' | null>(null);
-  const fileInputRef = React.useRef<HTMLInputElement>(null);
-  const canvasContainerRef = React.useRef<HTMLDivElement>(null);
-  const [canvasBounds, setCanvasBounds] = useState<DOMRect | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   
-  const hasEditingProps = onToolChange && onSelectionChange && onMaskChange;
+  // Pan and zoom states
+  const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
+  const [zoom, setZoom] = useState(1);
+  const [isPanning, setIsPanning] = useState(false);
+  const [isInteracting, setIsInteracting] = useState(false);
+  const [lastInteractionTime, setLastInteractionTime] = useState(0);
+  
+  const canvasRef = useRef<HTMLDivElement>(null);
+  const imageContainerRef = useRef<HTMLDivElement>(null);
+  const panStartPos = useRef({ x: 0, y: 0 });
+  const panStartOffset = useRef({ x: 0, y: 0 });
+  
+  // Hide controls after interaction stops
+  useEffect(() => {
+    if (isInteracting) {
+      const timer = setTimeout(() => {
+        setIsInteracting(false);
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [lastInteractionTime, isInteracting]);
 
-  // More precise hover detection for canvas
-  const handleCanvasMouseMove = useCallback((e: React.MouseEvent) => {
-    if (!canvasContainerRef.current) return;
+  // Calculate pan boundaries based on zoom level
+  const calculatePanBoundaries = useCallback(() => {
+    if (!imageContainerRef.current || zoom <= 1) return null;
     
-    // Find the actual canvas element to get its precise bounds
-    const canvas = canvasContainerRef.current.querySelector('canvas');
-    if (!canvas) {
-      setIsHovering(false);
+    const container = canvasRef.current;
+    if (!container) return null;
+    
+    const containerRect = container.getBoundingClientRect();
+    const imageRect = imageContainerRef.current.getBoundingClientRect();
+    
+    // Calculate how much the zoomed image exceeds the viewport
+    const scaledWidth = imageRect.width * zoom;
+    const scaledHeight = imageRect.height * zoom;
+    
+    const maxPanX = Math.max(0, (scaledWidth - containerRect.width) / 2);
+    const maxPanY = Math.max(0, (scaledHeight - containerRect.height) / 2);
+    
+    return { maxPanX, maxPanY };
+  }, [zoom]);
+
+  // Pan handlers
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    if (!generatedMedia || zoom <= 1) return; // Only allow panning when zoomed in
+    
+    setIsPanning(true);
+    setIsInteracting(true);
+    panStartPos.current = { x: e.clientX, y: e.clientY };
+    panStartOffset.current = { ...panOffset };
+  }, [generatedMedia, panOffset, zoom]);
+
+  const handleMouseMove = useCallback((e: React.MouseEvent) => {
+    if (!isPanning) return;
+    
+    const dx = e.clientX - panStartPos.current.x;
+    const dy = e.clientY - panStartPos.current.y;
+    
+    let newX = panStartOffset.current.x + dx;
+    let newY = panStartOffset.current.y + dy;
+    
+    // Apply boundaries
+    const boundaries = calculatePanBoundaries();
+    if (boundaries) {
+      newX = Math.max(-boundaries.maxPanX, Math.min(boundaries.maxPanX, newX));
+      newY = Math.max(-boundaries.maxPanY, Math.min(boundaries.maxPanY, newY));
+    }
+    
+    setPanOffset({ x: newX, y: newY });
+    setLastInteractionTime(Date.now());
+  }, [isPanning, calculatePanBoundaries]);
+
+  const handleMouseUp = useCallback(() => {
+    setIsPanning(false);
+  }, []);
+
+  const handleMouseLeave = useCallback(() => {
+    setIsPanning(false);
+  }, []);
+
+  // Zoom handler
+  const handleWheel = useCallback((e: React.WheelEvent) => {
+    if (!generatedMedia) return;
+    
+    e.preventDefault();
+    setIsInteracting(true);
+    
+    const delta = -e.deltaY * 0.001;
+    // Limit zoom: minimum 1.0 (original size), maximum 5.0
+    const newZoom = Math.max(1.0, Math.min(5, zoom + delta));
+    
+    // Only update if zoom actually changed
+    if (newZoom === zoom) {
+      setLastInteractionTime(Date.now());
       return;
     }
     
-    const canvasRect = canvas.getBoundingClientRect();
-    setCanvasBounds(canvasRect);
+    // Reset pan offset when zooming back to 1.0
+    if (newZoom === 1.0) {
+      setPanOffset({ x: 0, y: 0 });
+      setZoom(newZoom);
+      setLastInteractionTime(Date.now());
+      return;
+    }
     
-    const x = e.clientX;
-    const y = e.clientY;
+    // Zoom towards mouse cursor
+    if (imageContainerRef.current) {
+      const rect = imageContainerRef.current.getBoundingClientRect();
+      const mouseX = e.clientX - rect.left - rect.width / 2;
+      const mouseY = e.clientY - rect.top - rect.height / 2;
+      
+      const zoomRatio = newZoom / zoom;
+      setPanOffset({
+        x: panOffset.x - mouseX * (zoomRatio - 1),
+        y: panOffset.y - mouseY * (zoomRatio - 1),
+      });
+    }
     
-    const isOverCanvas = x >= canvasRect.left && 
-                         x <= canvasRect.right && 
-                         y >= canvasRect.top && 
-                         y <= canvasRect.bottom;
-    
-    setIsHovering(isOverCanvas);
-  }, []);
+    setZoom(newZoom);
+    setLastInteractionTime(Date.now());
+  }, [generatedMedia, zoom, panOffset]);
 
   const handleDragEnter = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -148,11 +201,12 @@ export function GenerationCanvas({
     [onFileUpload]
   );
 
-  const handleClick = useCallback(() => {
-    if (!generatedMedia && !isGenerating) {
+  const handleClick = useCallback((e: React.MouseEvent) => {
+    // Only trigger upload if not panning/zooming and no media is present
+    if (!generatedMedia && !isGenerating && !isPanning) {
       fileInputRef.current?.click();
     }
-  }, [generatedMedia, isGenerating]);
+  }, [generatedMedia, isGenerating, isPanning]);
 
   const handleFileChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -199,16 +253,44 @@ export function GenerationCanvas({
 
   return (
     <div
+      ref={canvasRef}
       className={cn(
-        "relative flex items-center justify-center bg-muted/30 overflow-hidden",
+        "relative flex items-center justify-center overflow-hidden bg-neutral-50",
         className
       )}
+      style={{
+        cursor: generatedMedia 
+          ? (isPanning ? 'grabbing' : (zoom > 1 ? 'grab' : 'default'))
+          : 'default'
+      }}
       onDragEnter={handleDragEnter}
       onDragLeave={handleDragLeave}
       onDragOver={handleDragOver}
       onDrop={handleDrop}
       onClick={handleClick}
+      onMouseDown={handleMouseDown}
+      onMouseMove={handleMouseMove}
+      onMouseUp={handleMouseUp}
+      onMouseLeave={handleMouseLeave}
+      onWheel={handleWheel}
     >
+      {/* Animated Dot Pattern Background - moves opposite to pan */}
+      <div
+        className="absolute inset-0"
+        style={{
+          transform: `translate(${-panOffset.x}px, ${-panOffset.y}px)`,
+          transition: isPanning ? 'none' : 'transform 0.1s ease-out',
+        }}
+      >
+        <DotPattern
+          width={20}
+          height={20}
+          cx={1}
+          cy={1}
+          cr={1}
+          className="text-neutral-400/50"
+        />
+      </div>
       {/* Loading State */}
       {isGenerating && (
         <div className="flex flex-col items-center justify-center space-y-4">
@@ -275,202 +357,47 @@ export function GenerationCanvas({
 
       {/* Generated Media Display */}
       {generatedMedia && !isGenerating && (
-        <div className="relative w-full h-full flex items-center justify-center p-4">
-          {/* Editing Toolbar - Left Side */}
-          {generatedMedia.type === "image" && hasEditingProps && (
-            <div className="absolute left-6 top-1/2 -translate-y-1/2 z-10">
-              <EditingToolbar
-                activeTool={activeTool}
-                onToolChange={onToolChange}
-                disabled={false}
-              />
-            </div>
-          )}
-          
-          {/* Brush Size Control - Below Canvas */}
-          {generatedMedia.type === "image" && hasEditingProps && activeTool === 'mask' && (
-            <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-10">
-              <BrushSizeControl
-                brushSize={brushSize}
-                onBrushSizeChange={onBrushSizeChange!}
-              />
-            </div>
-          )}
-          
-          {/* Text Editor - Right Side */}
-          {generatedMedia.type === "image" && hasEditingProps && activeTool === 'text' && (
-            <div className="absolute right-6 top-6 z-10">
-              <TextEditor onAddText={onTextLayerAdd!} />
-            </div>
-          )}
-          
-          {/* Image Adjustments - Right Side */}
-          {generatedMedia.type === "image" && hasEditingProps && activeTool === 'adjust' && (
-            <div className="absolute right-6 top-6 z-10">
-              <ImageAdjustments
-                adjustments={imageAdjustments}
-                onAdjustmentsChange={onImageAdjustmentsChange!}
-                onReset={onImageAdjustmentsReset!}
-              />
-            </div>
-          )}
-          
-          {/* Image/Video Display */}
-          {generatedMedia.type === "image" && hasEditingProps ? (
-            <div 
-              ref={canvasContainerRef}
-              className="relative w-full h-full group"
-              onMouseMove={handleCanvasMouseMove}
-              onMouseLeave={() => setIsHovering(false)}
-            >
-              <ImageEditorCanvas
-                imageUrl={generatedMedia.url}
-                activeTool={activeTool}
-                selection={selection}
-                maskData={maskData}
-                textLayers={textLayers}
-                imageAdjustments={imageAdjustments}
-                brushSize={brushSize}
-                onSelectionChange={onSelectionChange}
-                onMaskChange={onMaskChange}
-                onTextLayerUpdate={onTextLayerUpdate!}
-              />
-          
-              {/* Hover Overlay with Controls */}
-              <TooltipProvider delayDuration={300}>
-                {canvasBounds && (
-                  <div 
-                    className={cn(
-                      "fixed transition-opacity duration-200 pointer-events-none",
-                      isHovering ? "opacity-100" : "opacity-0"
-                    )}
-                    style={{
-                      left: canvasBounds.left,
-                      top: canvasBounds.top,
-                      width: canvasBounds.width,
-                      height: canvasBounds.height,
-                    }}
-                  >
-                    {/* Content Credentials - Top Left */}
-                    <div className="absolute top-4 left-4 pointer-events-auto">
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            size="icon"
-                            variant="secondary"
-                            className="h-10 w-10 rounded-full bg-background/90 backdrop-blur-sm hover:bg-background shadow-lg"
-                          >
-                            <Info className="h-5 w-5" />
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent side="right">
-                          <p className="font-medium">Image created by AI using Bria.ai</p>
-                        </TooltipContent>
-                      </Tooltip>
-                    </div>
-
-                    {/* Export and Fullscreen - Top Right */}
-                    <div className="absolute top-4 right-4 flex gap-2 pointer-events-auto">
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            size="icon"
-                            variant="secondary"
-                            className="h-10 w-10 rounded-full bg-background/90 backdrop-blur-sm hover:bg-background shadow-lg"
-                            onClick={handleExport}
-                          >
-                            <Download className="h-5 w-5" />
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          <p>Export</p>
-                        </TooltipContent>
-                      </Tooltip>
-
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            size="icon"
-                            variant="secondary"
-                            className="h-10 w-10 rounded-full bg-background/90 backdrop-blur-sm hover:bg-background shadow-lg"
-                            onClick={handleFullscreen}
-                          >
-                            <Maximize2 className="h-5 w-5" />
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          <p>Fullscreen</p>
-                        </TooltipContent>
-                      </Tooltip>
-                    </div>
-
-                    {/* Feedback - Bottom Center */}
-                    <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2 pointer-events-auto">
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            size="icon"
-                            variant={feedback === 'up' ? 'default' : 'secondary'}
-                            className={cn(
-                              "h-10 w-10 rounded-full shadow-lg transition-all",
-                              feedback === 'up' 
-                                ? "bg-primary text-primary-foreground" 
-                                : "bg-background/90 backdrop-blur-sm hover:bg-background"
-                            )}
-                            onClick={() => handleFeedback('up')}
-                          >
-                            <ThumbsUp className={cn("h-5 w-5", feedback === 'up' && "fill-current")} />
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          <p>Good result</p>
-                        </TooltipContent>
-                      </Tooltip>
-
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            size="icon"
-                            variant={feedback === 'down' ? 'default' : 'secondary'}
-                            className={cn(
-                              "h-10 w-10 rounded-full shadow-lg transition-all",
-                              feedback === 'down' 
-                                ? "bg-primary text-primary-foreground" 
-                                : "bg-background/90 backdrop-blur-sm hover:bg-background"
-                            )}
-                            onClick={() => handleFeedback('down')}
-                          >
-                            <ThumbsDown className={cn("h-5 w-5", feedback === 'down' && "fill-current")} />
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          <p>Poor result</p>
-                        </TooltipContent>
-                      </Tooltip>
-                    </div>
-                  </div>
-                )}
-              </TooltipProvider>
-            </div>
-          ) : generatedMedia.type === "image" ? (
-            <div className="flex items-center justify-center w-full h-full">
-              <div 
-                className="relative group inline-block max-w-full max-h-full"
-                onMouseEnter={() => setIsHovering(true)}
-                onMouseLeave={() => setIsHovering(false)}
-              >
+        <div 
+          className="relative w-full h-full flex items-center justify-center"
+          style={{
+            pointerEvents: 'none'
+          }}
+        >
+          <div
+            ref={imageContainerRef}
+            className="relative"
+            style={{
+              transform: `translate(${panOffset.x}px, ${panOffset.y}px) scale(${zoom})`,
+              transformOrigin: 'center center',
+              transition: isPanning ? 'none' : 'transform 0.1s ease-out',
+              maxWidth: 'calc(100% - 8rem)',
+              maxHeight: 'calc(100% - 8rem)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            {generatedMedia.type === "image" ? (
+              <div className="relative group" style={{ pointerEvents: 'auto' }}>
                 <img
                   src={generatedMedia.url}
                   alt="Generated content"
-                  className="max-w-full max-h-full object-contain rounded-lg shadow-lg"
+                  className="max-w-full max-h-full w-auto h-auto object-contain rounded-lg shadow-lg"
+                  style={{
+                    maxWidth: '55vw',
+                    maxHeight: '60vh',
+                  }}
+                  draggable={false}
                 />
-              
-                {/* Hover Overlay with Controls */}
-                <TooltipProvider delayDuration={300}>
-                  <div className={cn(
+            
+              {/* Hover Overlay with Controls */}
+              <TooltipProvider delayDuration={300}>
+                <div 
+                  className={cn(
                     "absolute inset-0 transition-opacity duration-200 pointer-events-none",
-                    isHovering ? "opacity-100" : "opacity-0"
-                  )}>
+                    isInteracting ? "opacity-0" : "opacity-100"
+                  )}
+                >
                     {/* Content Credentials - Top Left */}
                     <div className="absolute top-4 left-4 pointer-events-auto">
                       <Tooltip>
@@ -571,14 +498,19 @@ export function GenerationCanvas({
                   </div>
                 </TooltipProvider>
               </div>
-            </div>
-          ) : (
-            <video
-              src={generatedMedia.url}
-              controls
-              className="max-w-full max-h-full rounded-lg shadow-lg"
-            />
-          )}
+            ) : (
+              <video
+                src={generatedMedia.url}
+                controls
+                className="max-w-full max-h-full rounded-lg shadow-lg"
+                style={{
+                  maxWidth: '55vw',
+                  maxHeight: '60vh',
+                  pointerEvents: 'auto'
+                }}
+              />
+            )}
+          </div>
         </div>
       )}
 
