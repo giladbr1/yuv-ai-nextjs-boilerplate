@@ -56,7 +56,7 @@ function MessageBubble({ message }: MessageBubbleProps) {
     >
       <div
         className={cn(
-          "max-w-[85%] rounded-lg px-4 py-3 shadow-sm",
+          "max-w-full rounded-lg px-4 py-3 shadow-sm",
           isUser
             ? "bg-primary text-primary-foreground"
             : isError

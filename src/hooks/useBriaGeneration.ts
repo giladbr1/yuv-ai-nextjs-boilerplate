@@ -45,7 +45,6 @@ interface UseBriaGenerationReturn {
   // State
   messages: ChatMessage[];
   params: GenerationParams;
-  attributionAmount: number;
   generatedMedia?: GeneratedMedia;
   galleryItems: GeneratedMedia[];
   activeItemId?: string;
@@ -1300,7 +1299,6 @@ export function useBriaGeneration(): UseBriaGenerationReturn {
   return {
     messages,
     params,
-    attributionAmount,
     generatedMedia,
     galleryItems,
     activeItemId,

@@ -12,7 +12,6 @@ export default function Home() {
   const {
     messages,
     params,
-    attributionAmount,
     generatedMedia,
     galleryItems,
     activeItemId,
@@ -68,12 +67,17 @@ export default function Home() {
   return (
     <div className="flex flex-col h-screen overflow-hidden">
       {/* Header */}
-      <BriaHeader attributionAmount={attributionAmount} />
+      <BriaHeader
+        mode={params.mode}
+        modelVersion={params.model_version}
+        onModeChange={(mode) => updateParams({ mode })}
+        onModelChange={(model_version) => updateParams({ model_version })}
+      />
 
       {/* Main Content */}
       <div className="flex flex-1 overflow-hidden">
         {/* Left Sidebar - Instructions & Controls */}
-        <div className="w-1/3 border-r bg-background">
+        <div className="w-[20%] border-r bg-background">
           <LeftSidebar
             messages={messages}
             params={params}

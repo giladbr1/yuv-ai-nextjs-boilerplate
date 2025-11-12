@@ -3,14 +3,6 @@
 import React, { useState } from "react";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -125,58 +117,6 @@ export function GenerationControls({
           onChange={handleFileChange}
           className="hidden"
         />
-      </div>
-
-      {/* Mode Toggle */}
-      <div className="space-y-2">
-        <Label>Mode</Label>
-        <Tabs
-          value={params.mode}
-          onValueChange={(value) =>
-            onParamsChange({ mode: value as "image" | "video" })
-          }
-          className="w-full"
-        >
-          <TabsList className="w-full">
-            <TabsTrigger value="image" className="flex-1">
-              Image
-            </TabsTrigger>
-            <TabsTrigger value="video" className="flex-1">
-              Video
-            </TabsTrigger>
-          </TabsList>
-        </Tabs>
-      </div>
-
-      {/* Model Selection */}
-      <div className="space-y-2">
-        <Label>Model</Label>
-        <Select
-          value={params.model_version}
-          onValueChange={(value) =>
-            onParamsChange({
-              model_version: value as "Fibo" | "3.2" | "EA tailored",
-            })
-          }
-        >
-          <SelectTrigger>
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="Fibo">Fibo</SelectItem>
-            <SelectItem value="3.2">3.2</SelectItem>
-            <SelectItem value="EA tailored">EA tailored</SelectItem>
-            <div className="px-2 py-1.5 text-sm">
-              <a
-                href="#"
-                className="text-primary hover:underline"
-                onClick={(e) => e.preventDefault()}
-              >
-                train a tailored engine
-              </a>
-            </div>
-          </SelectContent>
-        </Select>
       </div>
 
       {/* Model Influence - Only visible for EA tailored */}

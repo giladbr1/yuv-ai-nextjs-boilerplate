@@ -29,7 +29,7 @@ export function GalleryBar({
     return (
       <div
         className={cn(
-          "h-full w-32 bg-background/50 border-l flex items-center justify-center",
+          "h-full w-[90px] bg-background/50 border-l flex items-center justify-center",
           className
         )}
       >
@@ -43,11 +43,11 @@ export function GalleryBar({
   return (
     <div
       className={cn(
-        "h-full w-32 bg-background/50 border-l overflow-hidden flex flex-col",
+        "h-full w-[80px] bg-background/50 border-l overflow-hidden flex flex-col",
         className
       )}
     >
-      <div className="flex-1 flex flex-col gap-3 p-3 overflow-y-auto scrollbar-thin scrollbar-thumb-muted scrollbar-track-transparent">
+      <div className="flex-1 flex flex-col gap-2 p-2 overflow-y-auto scrollbar-thin scrollbar-thumb-muted scrollbar-track-transparent">
         {items.map((item) => {
           const isActive = item.id === activeItemId;
           
