@@ -86,12 +86,6 @@ export default function Home() {
             onImageUpload={uploadImageForReference}
             onSurpriseMe={surpriseMe}
             isGenerating={isGenerating}
-            hasImage={!!generatedMedia}
-            activeOperation={activeOperation}
-            operationLoadingName={operationLoadingName}
-            onOperationSelect={selectOperation}
-            onOperationCancel={cancelOperation}
-            onOperationExecute={executeOneClickOperation}
           />
         </div>
 
@@ -105,6 +99,9 @@ export default function Home() {
               batchExecution={batchExecution}
               onFileUpload={uploadImageForDisplay}
               className="h-full w-full"
+              hasImage={!!generatedMedia}
+              onOperationExecute={executeOneClickOperation}
+              onAspectRatioChange={(aspectRatio) => updateParams({ aspectRatio })}
             />
           </div>
           
