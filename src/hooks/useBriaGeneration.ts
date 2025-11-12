@@ -155,6 +155,41 @@ export function useBriaGeneration(): UseBriaGenerationReturn {
     }>;
   } | null>(null);
 
+  // 30-second timeout for loading states
+  useEffect(() => {
+    if (!isGenerating && !operationLoadingName) {
+      return; // No active loading state
+    }
+
+    console.log("⏱️ Starting 30-second timeout for loading state");
+    const timeoutId = setTimeout(() => {
+      console.warn("⚠️ Generation timeout reached (30 seconds) - clearing loading indicators");
+      
+      // Clear loading state
+      setIsGenerating(false);
+      setOperationLoadingName(null);
+      
+      // Remove loading placeholders from gallery
+      setGalleryItems((prev) => prev.filter(item => !item.isLoading));
+      
+      // Update agent message with timeout error
+      updateAgentMessage({
+        content: "The operation timed out after 30 seconds. Please try again.",
+        status: "error",
+        isError: true,
+        agentStatus: undefined,
+      });
+      
+      // Set error state
+      setError("Operation timed out after 30 seconds");
+    }, 30000); // 30 seconds
+
+    // Cleanup timeout on unmount or when loading completes
+    return () => {
+      clearTimeout(timeoutId);
+    };
+  }, [isGenerating, operationLoadingName]);
+
   // Helper function to add media to gallery
   const addToGallery = useCallback((media: Omit<GeneratedMedia, 'id' | 'timestamp'>, replaceLoading = true) => {
     const newItem: GeneratedMedia = {

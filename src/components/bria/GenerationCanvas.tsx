@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/tooltip";
 import {
   Popover,
+  PopoverClose,
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
@@ -294,7 +295,7 @@ export function GenerationCanvas({
       onWheel={handleWheel}
     >
       {/* Floating AI Operations Toolbox */}
-      {onOperationExecute && (
+      {onOperationExecute && hasImage && (
         <div className="absolute top-6 left-1/2 -translate-x-1/2 z-50">
           <TooltipProvider delayDuration={200}>
             <div className="flex items-center gap-1 bg-white/95 backdrop-blur-md rounded-full px-3 py-1.5 shadow-lg border border-neutral-200/50">
@@ -379,22 +380,26 @@ export function GenerationCanvas({
                 </Tooltip>
                 <PopoverContent className="w-28 p-2" align="center" side="bottom">
                   <div className="flex flex-col gap-1">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="justify-center h-8 text-sm font-medium"
-                      onClick={() => onOperationExecute("increase-resolution", { scale: 2 })}
-                    >
-                      2x
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="justify-center h-8 text-sm font-medium"
-                      onClick={() => onOperationExecute("increase-resolution", { scale: 4 })}
-                    >
-                      4x
-                    </Button>
+                    <PopoverClose asChild>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="justify-center h-8 text-sm font-medium"
+                        onClick={() => onOperationExecute("increase-resolution", { scale: 2 })}
+                      >
+                        2x
+                      </Button>
+                    </PopoverClose>
+                    <PopoverClose asChild>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="justify-center h-8 text-sm font-medium"
+                        onClick={() => onOperationExecute("increase-resolution", { scale: 4 })}
+                      >
+                        4x
+                      </Button>
+                    </PopoverClose>
                   </div>
                 </PopoverContent>
               </Popover>
@@ -418,24 +423,25 @@ export function GenerationCanvas({
                       </PopoverTrigger>
                     </TooltipTrigger>
                     <TooltipContent>
-                      <p>Expand Canvas</p>
+                      <p>Expand Image</p>
                     </TooltipContent>
                   </Tooltip>
                   <PopoverContent className="w-28 p-2" align="center" side="bottom">
                     <div className="flex flex-col gap-1">
                       {aspectRatios.map((ratio) => (
-                        <Button
-                          key={ratio.value}
-                          variant="ghost"
-                          size="sm"
-                          className="justify-center h-8 text-sm font-medium"
-                          onClick={() => {
-                            onAspectRatioChange(ratio.value);
-                            onOperationExecute("expand", { target_aspect_ratio: ratio.value });
-                          }}
-                        >
-                          {ratio.label}
-                        </Button>
+                        <PopoverClose key={ratio.value} asChild>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="justify-center h-8 text-sm font-medium"
+                            onClick={() => {
+                              onAspectRatioChange(ratio.value);
+                              onOperationExecute("expand", { target_aspect_ratio: ratio.value });
+                            }}
+                          >
+                            {ratio.label}
+                          </Button>
+                        </PopoverClose>
                       ))}
                     </div>
                   </PopoverContent>
