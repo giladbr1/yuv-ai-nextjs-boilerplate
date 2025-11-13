@@ -1,8 +1,17 @@
 import type { Metadata } from "next";
+import { Outfit } from "next/font/google";
 import "./globals.css";
 import { AccessibilityProvider } from "@/context/AccessibilityContext";
 import { AccessibilityControls } from "@/components/layout/AccessibilityControls";
 import { Toaster } from "sonner";
+
+// Optimize font loading with Next.js font optimization
+const outfit = Outfit({
+  subsets: ["latin"],
+  weight: ["100", "200", "300", "400", "500", "600", "700", "800", "900"],
+  display: "swap",
+  variable: "--font-outfit",
+});
 
 export const metadata: Metadata = {
   title: "Bria Agentic Generation Interface",
@@ -19,12 +28,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className="light" suppressHydrationWarning>
-      <head>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@100..900&display=swap" rel="stylesheet" />
-      </head>
-      <body className="outfit-app min-h-screen bg-background antialiased transition-colors">
+      <body className={`${outfit.variable} outfit-app min-h-screen bg-background antialiased transition-colors`}>
         <AccessibilityProvider>
           {children}
           <AccessibilityControls />

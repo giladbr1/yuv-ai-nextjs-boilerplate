@@ -52,6 +52,13 @@ const aspectRatios = [
   { label: "4:3", value: "4:3", icon: RectangleHorizontal },
 ];
 
+const rotatingPlaceholders = [
+  "Generate an image",
+  "Replace the background",
+  "Come up with 3 variations",
+  "generate an image in 3 aspect ratios"
+];
+
 export function LeftSidebar({
   messages,
   params,
@@ -67,6 +74,9 @@ export function LeftSidebar({
 }: LeftSidebarProps) {
   const [uploadedImage, setUploadedImage] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [placeholderIndex, setPlaceholderIndex] = useState(0);
+  const [placeholderOpacity, setPlaceholderOpacity] = useState(1);
+  const [hasSentFirstPrompt, setHasSentFirstPrompt] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const promptTextareaRef = useRef<HTMLTextAreaElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -102,6 +112,35 @@ export function LeftSidebar({
       }
     }
   }, [shouldFocusPrompt, onPromptFocused]);
+
+  // Rotating placeholder animation - only before first prompt is sent
+  useEffect(() => {
+    // Only rotate if user hasn't sent first prompt yet, prompt is empty, and no custom placeholder is set
+    if (hasSentFirstPrompt || params.prompt.trim() || customPlaceholder) {
+      // Reset opacity when user types or custom placeholder is set
+      if (params.prompt.trim()) {
+        setPlaceholderOpacity(1);
+      }
+      return;
+    }
+
+    // Reset opacity when starting rotation
+    setPlaceholderOpacity(1);
+
+    const interval = setInterval(() => {
+      // Fade out
+      setPlaceholderOpacity(0);
+      
+      setTimeout(() => {
+        // Change placeholder after fade out
+        setPlaceholderIndex((prev) => (prev + 1) % rotatingPlaceholders.length);
+        // Fade in
+        setPlaceholderOpacity(1);
+      }, 300); // Half of transition duration
+    }, 3500); // Total cycle: 3.5 seconds (3s visible + 0.5s transition)
+
+    return () => clearInterval(interval);
+  }, [hasSentFirstPrompt, params.prompt, customPlaceholder]);
 
   const handleImageUploadClick = () => {
     fileInputRef.current?.click();
@@ -139,7 +178,11 @@ export function LeftSidebar({
 
   const handleGenerate = () => {
     if (params.prompt.trim()) {
+      // Mark that first prompt has been sent
+      setHasSentFirstPrompt(true);
       onGenerate();
+      // Reset prompt text after generation starts
+      onParamsChange({ prompt: "" });
     }
   };
 
@@ -172,15 +215,25 @@ export function LeftSidebar({
             <div className="relative">
               <Textarea
                 ref={promptTextareaRef}
-                placeholder={customPlaceholder || "What do you want to create?"}
+                placeholder={customPlaceholder || ""}
                 value={params.prompt}
                 onChange={(e) => onParamsChange({ prompt: e.target.value })}
                 onKeyDown={handleKeyDown}
                 className={cn(
                   "min-h-[120px] pr-[76px] pb-12 resize-none text-sm scrollbar-thin scrollbar-thumb-muted scrollbar-track-transparent",
-                  uploadedImage && "pb-20"
+                  uploadedImage && "pb-20",
+                  !customPlaceholder && !params.prompt.trim() && !hasSentFirstPrompt && "placeholder:opacity-0"
                 )}
               />
+              {/* Animated placeholder overlay for fade effect - only before first prompt */}
+              {!customPlaceholder && !params.prompt.trim() && !hasSentFirstPrompt && (
+                <div
+                  className="absolute top-3 left-3 pointer-events-none text-sm text-muted-foreground transition-opacity duration-300 select-none"
+                  style={{ opacity: placeholderOpacity }}
+                >
+                  {rotatingPlaceholders[placeholderIndex]}
+                </div>
+              )}
               
               {/* Uploaded Image Preview */}
               {uploadedImage && (

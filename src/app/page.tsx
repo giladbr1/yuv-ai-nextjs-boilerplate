@@ -1,12 +1,36 @@
 "use client";
 
-import React from "react";
+import React, { Suspense } from "react";
 import { BriaHeader } from "@/components/bria/BriaHeader";
 import { LeftSidebar } from "@/components/bria/LeftSidebar";
-import { GenerationCanvas } from "@/components/bria/GenerationCanvas";
-import { GalleryBar } from "@/components/bria/GalleryBar";
 import { useBriaGeneration } from "@/hooks/useBriaGeneration";
 import { toast } from "sonner";
+import dynamic from "next/dynamic";
+
+// Lazy load heavy components to reduce initial bundle size
+const GenerationCanvas = dynamic(
+  () => import("@/components/bria/GenerationCanvas").then((mod) => ({ default: mod.GenerationCanvas })),
+  {
+    loading: () => (
+      <div className="flex items-center justify-center h-full">
+        <div className="text-muted-foreground">Loading canvas...</div>
+      </div>
+    ),
+    ssr: false,
+  }
+);
+
+const GalleryBar = dynamic(
+  () => import("@/components/bria/GalleryBar").then((mod) => ({ default: mod.GalleryBar })),
+  {
+    loading: () => (
+      <div className="h-full w-[90px] bg-background/50 border-l flex items-center justify-center">
+        <div className="text-xs text-muted-foreground">Loading...</div>
+      </div>
+    ),
+    ssr: false,
+  }
+);
 
 export default function Home() {
   const {
@@ -45,6 +69,21 @@ export default function Home() {
   // Inpainting state
   const [shouldFocusPrompt, setShouldFocusPrompt] = React.useState(false);
   const [customPlaceholder, setCustomPlaceholder] = React.useState<string>();
+  const prevIsGeneratingRef = React.useRef(isGenerating);
+
+  // Auto-focus on page load
+  React.useEffect(() => {
+    setShouldFocusPrompt(true);
+  }, []);
+
+  // Auto-focus after generation completes
+  React.useEffect(() => {
+    if (prevIsGeneratingRef.current && !isGenerating) {
+      // Generation just completed
+      setShouldFocusPrompt(true);
+    }
+    prevIsGeneratingRef.current = isGenerating;
+  }, [isGenerating]);
 
   React.useEffect(() => {
     if (error) {
@@ -114,7 +153,7 @@ export default function Home() {
               onOperationExecute={executeOneClickOperation}
               onAspectRatioChange={(aspectRatio) => updateParams({ aspectRatio })}
               onPromptFocus={() => {
-                setCustomPlaceholder("What do you want in the masked area?");
+                setCustomPlaceholder("What would you like to see in the masked area?");
                 setShouldFocusPrompt(true);
               }}
               onFillMask={(maskBase64) => {
