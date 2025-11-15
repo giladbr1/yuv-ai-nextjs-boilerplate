@@ -17,6 +17,7 @@ interface GalleryBarProps {
   activeItemId?: string;
   onItemClick: (id: string) => void;
   className?: string;
+  width?: number;
 }
 
 export function GalleryBar({
@@ -24,14 +25,19 @@ export function GalleryBar({
   activeItemId,
   onItemClick,
   className,
+  width = 80,
 }: GalleryBarProps) {
+  const defaultWidth = items.length === 0 ? 90 : 80;
+  const galleryWidth = width || defaultWidth;
+
   if (items.length === 0) {
     return (
       <div
         className={cn(
-          "h-full w-[90px] bg-background/50 border-l flex items-center justify-center",
+          "h-full bg-background/50 border-l flex items-center justify-center flex-shrink-0",
           className
         )}
+        style={{ width: `${galleryWidth}px` }}
       >
         <p className="text-xs text-muted-foreground text-center px-2 rotate-0 writing-mode-vertical">
           Gallery
@@ -43,9 +49,10 @@ export function GalleryBar({
   return (
     <div
       className={cn(
-        "h-full w-[80px] bg-background/50 border-l overflow-hidden flex flex-col",
+        "h-full bg-background/50 border-l overflow-hidden flex flex-col flex-shrink-0",
         className
       )}
+      style={{ width: `${galleryWidth}px` }}
     >
       <div className="flex-1 flex flex-col gap-2 p-2 overflow-y-auto scrollbar-thin scrollbar-thumb-muted scrollbar-track-transparent">
         {items.map((item) => {
