@@ -39,6 +39,13 @@ export interface GeneratedMedia {
     [key: string]: any;
   };
   isLoading?: boolean; // True when generation is in progress
+  // Generation parameters for restoring
+  generationParams?: {
+    prompt: string;
+    params: GenerationParams;
+    referenceImageUrl?: string; // Reference image used for image-to-image
+    aiOperation?: string; // AI operation name if used (e.g., "remove-background")
+  };
 }
 
 interface UseBriaGenerationReturn {
@@ -51,6 +58,7 @@ interface UseBriaGenerationReturn {
   isGenerating: boolean;
   error?: string;
   editingState: EditingState;
+  uploadedImageContext: { url: string; mcpResponse?: any; filename?: string } | null;
   
   // Instructions Pane State
   instructionsPaneState: InstructionsPaneState;
@@ -80,7 +88,9 @@ interface UseBriaGenerationReturn {
   uploadImageForDisplay: (file: File) => Promise<void>; // For canvas display
   surpriseMe: () => void;
   clearError: () => void;
+  clearUploadedImageContext: () => void;
   setActiveItem: (id: string) => void;
+  restoreParametersFromGallery: (itemId: string) => void;
   
   // Editing Actions
   setActiveTool: (tool: EditingTool) => void;
@@ -198,10 +208,23 @@ export function useBriaGeneration(): UseBriaGenerationReturn {
 
   // Helper function to add media to gallery
   const addToGallery = useCallback((media: Omit<GeneratedMedia, 'id' | 'timestamp'>, replaceLoading = true) => {
+    // Determine reference image: for AI operations, use the source image (generatedMedia),
+    // otherwise use uploadedImageContext (for image-to-image generation)
+    const referenceImageUrl = activeOperation 
+      ? (generatedMedia?.imageUrl || generatedMedia?.url || undefined)
+      : (uploadedImageContext?.url || undefined);
+
     const newItem: GeneratedMedia = {
       ...media,
       id: `gallery-${Date.now()}`,
       timestamp: new Date(),
+      // Store generation parameters if not already provided
+      generationParams: media.generationParams || (media.type === "image" || media.type === "video" ? {
+        prompt: params.prompt,
+        params: { ...params },
+        referenceImageUrl,
+        aiOperation: activeOperation || undefined,
+      } : undefined),
     };
     
     console.log("➕ Adding item to gallery:");
@@ -232,7 +255,7 @@ export function useBriaGeneration(): UseBriaGenerationReturn {
     setActiveItemId(newItem.id);
     
     return newItem;
-  }, []);
+  }, [params, uploadedImageContext, activeOperation, generatedMedia]);
 
   // Update the last agent message in place
   const updateAgentMessage = useCallback((updates: Partial<Pick<ChatMessage, 'content' | 'agentStatus' | 'status' | 'isError'>>) => {
@@ -1016,6 +1039,11 @@ export function useBriaGeneration(): UseBriaGenerationReturn {
     setError(undefined);
   }, []);
 
+  // Clear uploaded image context
+  const clearUploadedImageContext = useCallback(() => {
+    setUploadedImageContext(null);
+  }, []);
+
   // Editing Methods
   const setActiveTool = useCallback((tool: EditingTool) => {
     setEditingState((prev) => {
@@ -1356,6 +1384,55 @@ export function useBriaGeneration(): UseBriaGenerationReturn {
     setInpaintingMaskBase64(maskBase64);
   }, []);
 
+  // Restore generation parameters from a gallery item
+  const restoreParametersFromGallery = useCallback(async (itemId: string) => {
+    const item = galleryItems.find((item) => item.id === itemId);
+    if (!item || !item.generationParams) {
+      console.warn("⚠️ Gallery item not found or has no generation parameters:", itemId);
+      return;
+    }
+
+    const { prompt, params: savedParams, referenceImageUrl, aiOperation } = item.generationParams;
+
+    // Restore parameters
+    setParams(savedParams);
+
+    // Restore reference image if it exists
+    if (referenceImageUrl) {
+      try {
+        // Convert data URL or remote URL to File object for uploadImageForReference
+        const response = await fetch(referenceImageUrl);
+        const blob = await response.blob();
+        const file = new File([blob], "reference-image.jpg", { type: blob.type });
+        await uploadImageForReference(file);
+      } catch (err) {
+        console.error("Failed to restore reference image:", err);
+      }
+    } else {
+      // Clear reference image if none was used
+      setUploadedImageContext(null);
+    }
+
+    // If it was an AI operation, set the prompt to the operation name
+    if (aiOperation) {
+      // Map operation names to display text
+      const operationNames: Record<string, string> = {
+        "remove-background": "remove background",
+        "blur-background": "blur background",
+        "enhance-image": "enhance image",
+        "increase-resolution": "increase resolution",
+        "replace-background": "replace background",
+        "generative-fill": "generative fill",
+        "object-eraser": "object eraser",
+        "expand": "expand",
+      };
+      setParams((prev) => ({ ...prev, prompt: operationNames[aiOperation] || aiOperation }));
+    } else {
+      // Restore the original prompt
+      setParams((prev) => ({ ...prev, prompt }));
+    }
+  }, [galleryItems, uploadImageForReference]);
+
   return {
     messages,
     params,
@@ -1365,6 +1442,7 @@ export function useBriaGeneration(): UseBriaGenerationReturn {
     isGenerating,
     error,
     editingState,
+    uploadedImageContext,
     instructionsPaneState,
     activeOperation,
     operationLoadingName,
@@ -1377,7 +1455,9 @@ export function useBriaGeneration(): UseBriaGenerationReturn {
     uploadImageForDisplay,
     surpriseMe,
     clearError,
+    clearUploadedImageContext,
     setActiveItem,
+    restoreParametersFromGallery,
     setActiveTool,
     updateSelection,
     updateMask,

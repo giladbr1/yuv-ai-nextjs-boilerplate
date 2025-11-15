@@ -38,12 +38,14 @@ interface LeftSidebarProps {
   onParamsChange: (params: Partial<GenerationParams>) => void;
   onGenerate: () => void;
   onImageUpload: (file: File) => void;
+  onRemoveImage?: () => void;
   onSurpriseMe: () => void;
   isGenerating?: boolean;
   className?: string;
   customPlaceholder?: string;
   shouldFocusPrompt?: boolean;
   onPromptFocused?: () => void;
+  uploadedImageContext?: { url: string; mcpResponse?: any; filename?: string } | null;
 }
 
 const aspectRatios = [
@@ -56,7 +58,7 @@ const rotatingPlaceholders = [
   "Generate an image",
   "Replace the background",
   "Come up with 3 variations",
-  "generate an image in 3 aspect ratios"
+  "Generate an image in 3 aspect ratios"
 ];
 
 export function LeftSidebar({
@@ -65,14 +67,26 @@ export function LeftSidebar({
   onParamsChange,
   onGenerate,
   onImageUpload,
+  onRemoveImage,
   onSurpriseMe,
   isGenerating = false,
   className,
   customPlaceholder,
   shouldFocusPrompt = false,
   onPromptFocused,
+  uploadedImageContext,
 }: LeftSidebarProps) {
   const [uploadedImage, setUploadedImage] = useState<string | null>(null);
+  
+  // Sync uploadedImage with uploadedImageContext from hook
+  React.useEffect(() => {
+    if (uploadedImageContext?.url) {
+      setUploadedImage(uploadedImageContext.url);
+    } else if (!uploadedImageContext) {
+      // Clear if context is null (but keep if it's just undefined to avoid clearing during initial render)
+      setUploadedImage(null);
+    }
+  }, [uploadedImageContext]);
   const [isUploading, setIsUploading] = useState(false);
   const [placeholderIndex, setPlaceholderIndex] = useState(0);
   const [placeholderOpacity, setPlaceholderOpacity] = useState(1);
@@ -174,6 +188,10 @@ export function LeftSidebar({
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
+    // Notify parent to clear the context
+    if (onRemoveImage) {
+      onRemoveImage();
+    }
   };
 
   const handleGenerate = () => {
@@ -220,7 +238,7 @@ export function LeftSidebar({
                 onChange={(e) => onParamsChange({ prompt: e.target.value })}
                 onKeyDown={handleKeyDown}
                 className={cn(
-                  "min-h-[120px] pr-[76px] pb-12 resize-none text-sm scrollbar-thin scrollbar-thumb-muted scrollbar-track-transparent",
+                  "min-h-[120px] pr-24 pb-12 resize-none text-sm scrollbar-thin scrollbar-thumb-muted scrollbar-track-transparent",
                   uploadedImage && "pb-20",
                   !customPlaceholder && !params.prompt.trim() && !hasSentFirstPrompt && "placeholder:opacity-0"
                 )}
@@ -228,7 +246,7 @@ export function LeftSidebar({
               {/* Animated placeholder overlay for fade effect - only before first prompt */}
               {!customPlaceholder && !params.prompt.trim() && !hasSentFirstPrompt && (
                 <div
-                  className="absolute top-3 left-3 pointer-events-none text-sm text-muted-foreground transition-opacity duration-300 select-none"
+                  className="absolute top-3 left-3 right-24 pointer-events-none text-sm text-muted-foreground transition-opacity duration-300 select-none"
                   style={{ opacity: placeholderOpacity }}
                 >
                   {rotatingPlaceholders[placeholderIndex]}

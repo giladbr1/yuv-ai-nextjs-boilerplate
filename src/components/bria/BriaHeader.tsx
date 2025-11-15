@@ -31,27 +31,8 @@ export function BriaHeader({
   return (
     <header className="w-full border-b bg-background px-6 py-2">
       <div className="flex items-center justify-between gap-4">
-        {/* Bria Logo */}
-        <div className="flex items-center space-x-2 flex-shrink-0">
-          <svg
-            className="h-8 w-auto"
-            viewBox="0 0 120 40"
-            fill="none"
-            xmlns="http://www.w3.org/2000/svg"
-          >
-            <text
-              x="10"
-              y="30"
-              className="fill-primary text-2xl font-bold"
-              style={{ fontFamily: "Outfit, sans-serif" }}
-            >
-              BRIA
-            </text>
-          </svg>
-        </div>
-
-        {/* Center Controls */}
-        <div className="flex items-center gap-2 flex-1 justify-center">
+        {/* Left Controls */}
+        <div className="flex items-center gap-2">
           {/* Mode Toggle - Image/Video */}
           <div className="flex rounded-md border">
             <Button

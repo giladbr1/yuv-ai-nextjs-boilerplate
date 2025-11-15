@@ -3,6 +3,7 @@
 import React, { Suspense, useState, useRef, useCallback } from "react";
 import { BriaHeader } from "@/components/bria/BriaHeader";
 import { LeftSidebar } from "@/components/bria/LeftSidebar";
+import { GeminiSidebar } from "@/components/bria/GeminiSidebar";
 import { useBriaGeneration } from "@/hooks/useBriaGeneration";
 import { toast } from "sonner";
 import dynamic from "next/dynamic";
@@ -42,6 +43,7 @@ export default function Home() {
     isGenerating,
     error,
     editingState,
+    uploadedImageContext,
     activeOperation,
     operationLoadingName,
     batchExecution,
@@ -51,6 +53,7 @@ export default function Home() {
     uploadImageForDisplay,
     surpriseMe,
     clearError,
+    clearUploadedImageContext,
     setActiveItem,
     setActiveTool,
     updateSelection,
@@ -64,6 +67,7 @@ export default function Home() {
     cancelOperation,
     executeOneClickOperation,
     setInpaintingMask,
+    restoreParametersFromGallery,
   } = useBriaGeneration();
 
   // Inpainting state
@@ -72,14 +76,30 @@ export default function Home() {
   const prevIsGeneratingRef = React.useRef(isGenerating);
 
   // Gallery resize state
-  const DEFAULT_GALLERY_WIDTH = 80;
-  const MIN_GALLERY_WIDTH = 80;
+  const DEFAULT_GALLERY_WIDTH = 100;
+  const MIN_GALLERY_WIDTH = 100;
   const MAX_GALLERY_WIDTH = 160;
   const [galleryWidth, setGalleryWidth] = useState(DEFAULT_GALLERY_WIDTH);
   const [isResizing, setIsResizing] = useState(false);
   const resizeStartX = useRef(0);
   const resizeStartWidth = useRef(DEFAULT_GALLERY_WIDTH);
   const isResizingRef = useRef(false);
+
+  // Sidebar state
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const SIDEBAR_WIDTH = 256; // 64 * 4 = 256px (w-64)
+  const COLLAPSED_SIDEBAR_WIDTH = 64; // w-16 = 64px
+
+  // Define DEFAULT_PARAMS locally since it's not exported from the hook
+  const DEFAULT_PARAMS = {
+    mode: "image" as const,
+    model_version: "Fibo" as const,
+    modelInfluence: 0.8,
+    steps: 50,
+    aspectRatio: "1:1",
+    seed: "random",
+    prompt: "",
+  };
 
   const handleResizeMove = useCallback((e: MouseEvent) => {
     if (!isResizingRef.current) return;
@@ -168,81 +188,116 @@ export default function Home() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [editingState.activeTool, activeOperation, setActiveTool, cancelOperation]);
 
+  // Reset function - clears all state
+  const handleReset = useCallback(() => {
+    // Reset messages to initial state
+    updateParams(DEFAULT_PARAMS);
+    clearUploadedImageContext();
+    clearEditingState();
+    setActiveItem(undefined);
+    clearError();
+    // Reset local state
+    setShouldFocusPrompt(false);
+    setCustomPlaceholder(undefined);
+    // Note: We can't directly reset messages/generatedMedia/galleryItems from here
+    // as they're managed by the hook. We'll need to add a reset function to the hook
+    // or use window.location.reload() for a full reset
+    window.location.reload();
+  }, [updateParams, clearUploadedImageContext, clearEditingState, setActiveItem, clearError]);
+
   return (
-    <div className="flex flex-col h-screen overflow-hidden">
-      {/* Header */}
-      <BriaHeader
-        mode={params.mode}
-        modelVersion={params.model_version}
-        onModeChange={(mode) => updateParams({ mode })}
-        onModelChange={(model_version) => updateParams({ model_version })}
+    <div className="flex flex-col h-screen overflow-hidden relative">
+      {/* Gemini Sidebar */}
+      <GeminiSidebar
+        isOpen={isSidebarOpen}
+        onToggle={() => setIsSidebarOpen(!isSidebarOpen)}
+        onNewChat={handleReset}
       />
 
-      {/* Main Content */}
-      <div className="flex flex-1 overflow-hidden">
-        {/* Left Sidebar - Instructions & Controls */}
-        <div className="w-[20%] border-r bg-background">
-          <LeftSidebar
-            messages={messages}
-            params={params}
-            onParamsChange={updateParams}
-            onGenerate={generate}
-            onImageUpload={uploadImageForReference}
-            onSurpriseMe={surpriseMe}
-            isGenerating={isGenerating}
-            customPlaceholder={customPlaceholder}
-            shouldFocusPrompt={shouldFocusPrompt}
-            onPromptFocused={() => {
-              setShouldFocusPrompt(false);
-              setCustomPlaceholder(undefined);
-            }}
-          />
-        </div>
+      {/* Main Content - Offset by sidebar width (expands in place) */}
+      <div 
+        className="flex flex-col h-screen overflow-hidden transition-all duration-300 ease-in-out"
+        style={{ 
+          marginLeft: isSidebarOpen ? `${SIDEBAR_WIDTH}px` : `${COLLAPSED_SIDEBAR_WIDTH}px`
+        }}
+      >
+        {/* Header */}
+        <BriaHeader
+          mode={params.mode}
+          modelVersion={params.model_version}
+          onModeChange={(mode) => updateParams({ mode })}
+          onModelChange={(model_version) => updateParams({ model_version })}
+        />
 
-        {/* Right Canvas - Generation Area with Gallery */}
-        <div className="flex-1 flex bg-muted/30">
-          {/* Main Generation Display */}
-          <div className="flex-1 overflow-hidden" style={{ minWidth: 0 }}>
-            <GenerationCanvas
-              generatedMedia={generatedMedia}
+        {/* Main Content */}
+        <div className="flex flex-1 overflow-hidden">
+          {/* Left Sidebar - Instructions & Controls */}
+          <div className="w-[25%] border-r bg-background flex-shrink-0">
+            <LeftSidebar
+              messages={messages}
+              params={params}
+              onParamsChange={updateParams}
+              onGenerate={generate}
+              onImageUpload={uploadImageForReference}
+              onRemoveImage={clearUploadedImageContext}
+              onSurpriseMe={surpriseMe}
               isGenerating={isGenerating}
-              batchExecution={batchExecution}
-              onFileUpload={uploadImageForDisplay}
-              className="h-full w-full"
-              hasImage={!!generatedMedia}
-              onOperationExecute={executeOneClickOperation}
-              onAspectRatioChange={(aspectRatio) => updateParams({ aspectRatio })}
-              onPromptFocus={() => {
-                setCustomPlaceholder("What would you like to see in the masked area?");
-                setShouldFocusPrompt(true);
+              customPlaceholder={customPlaceholder}
+              shouldFocusPrompt={shouldFocusPrompt}
+              onPromptFocused={() => {
+                setShouldFocusPrompt(false);
+                setCustomPlaceholder(undefined);
               }}
-              onFillMask={(maskBase64) => {
-                setInpaintingMask(maskBase64);
-              }}
+              uploadedImageContext={uploadedImageContext}
             />
           </div>
-          
-          {/* Resize Handle */}
-          <div
-            onMouseDown={handleResizeStart}
-            className={`
-              w-1 cursor-col-resize hover:w-2 hover:bg-primary/50 transition-all relative
-              ${isResizing ? 'bg-primary w-2' : 'bg-transparent'}
-            `}
-            style={{ userSelect: 'none' }}
-            title="Drag to resize gallery"
-          >
-            {/* Visual indicator line */}
-            <div className="absolute inset-y-0 left-1/2 -translate-x-1/2 w-px bg-border opacity-50" />
+
+          {/* Right Canvas - Generation Area with Gallery */}
+          <div className="flex-1 flex bg-muted/30">
+            {/* Main Generation Display */}
+            <div className="flex-1 overflow-hidden" style={{ minWidth: 0 }}>
+              <GenerationCanvas
+                generatedMedia={generatedMedia}
+                isGenerating={isGenerating}
+                batchExecution={batchExecution}
+                onFileUpload={uploadImageForDisplay}
+                className="h-full w-full"
+                hasImage={!!generatedMedia}
+                onOperationExecute={executeOneClickOperation}
+                onAspectRatioChange={(aspectRatio) => updateParams({ aspectRatio })}
+                onPromptFocus={() => {
+                  setCustomPlaceholder("What would you like to see in the masked area?");
+                  setShouldFocusPrompt(true);
+                }}
+                onFillMask={(maskBase64) => {
+                  setInpaintingMask(maskBase64);
+                }}
+              />
+            </div>
+            
+            {/* Resize Handle */}
+            <div
+              onMouseDown={handleResizeStart}
+              className={`
+                w-1 cursor-col-resize hover:w-2 hover:bg-primary/50 transition-all relative
+                ${isResizing ? 'bg-primary w-2' : 'bg-transparent'}
+              `}
+              style={{ userSelect: 'none' }}
+              title="Drag to resize gallery"
+            >
+              {/* Visual indicator line */}
+              <div className="absolute inset-y-0 left-1/2 -translate-x-1/2 w-px bg-border opacity-50" />
+            </div>
+            
+            {/* Gallery Bar - Vertical on Right */}
+            <GalleryBar
+              items={galleryItems}
+              activeItemId={activeItemId}
+              onItemClick={setActiveItem}
+              onUseItem={restoreParametersFromGallery}
+              width={galleryWidth}
+            />
           </div>
-          
-          {/* Gallery Bar - Vertical on Right */}
-          <GalleryBar
-            items={galleryItems}
-            activeItemId={activeItemId}
-            onItemClick={setActiveItem}
-            width={galleryWidth}
-          />
         </div>
       </div>
     </div>

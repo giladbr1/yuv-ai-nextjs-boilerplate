@@ -31,7 +31,6 @@ export default function RootLayout({
       <body className={`${outfit.variable} outfit-app min-h-screen bg-background antialiased transition-colors`}>
         <AccessibilityProvider>
           {children}
-          <AccessibilityControls />
           <Toaster />
         </AccessibilityProvider>
       </body>

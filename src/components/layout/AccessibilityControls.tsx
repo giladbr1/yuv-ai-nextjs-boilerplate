@@ -2,7 +2,7 @@
 
 import { Button } from '@/components/ui/button';
 import { useAccessibility } from '@/context/AccessibilityContext';
-import { Sun, Moon, ZoomIn, ZoomOut, RotateCcw, Eye } from 'lucide-react';
+import { Sun, Moon, ZoomIn, ZoomOut, RotateCcw, Settings2 } from 'lucide-react';
 import { 
   DropdownMenu,
   DropdownMenuContent,
@@ -12,7 +12,11 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 
-export function AccessibilityControls() {
+interface AccessibilityControlsProps {
+  className?: string;
+}
+
+export function AccessibilityControls({ className = "fixed bottom-4 right-4 z-50" }: AccessibilityControlsProps = {}) {
   const {
     highContrast,
     toggleHighContrast,
@@ -24,16 +28,16 @@ export function AccessibilityControls() {
   } = useAccessibility();
 
   return (
-    <div className="fixed bottom-4 right-4 z-50">
+    <div className={className}>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button 
             size="icon" 
             variant="outline" 
-            className="bg-purple-600 text-white hover:bg-purple-700 shadow-md transition-all duration-300 hover:shadow-lg"
-            aria-label="Accessibility Options"
+            className="bg-background text-foreground hover:bg-muted border-border shadow-md transition-all duration-300 hover:shadow-lg"
+            aria-label="Settings"
           >
-            <Eye className="h-4 w-4" />
+            <Settings2 className="h-4 w-4" />
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="p-2">
