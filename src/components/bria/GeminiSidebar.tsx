@@ -3,7 +3,7 @@
 import React, { useEffect, useRef } from "react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { Plus, Menu, Pencil, Settings2, Sun, Moon, ZoomIn, ZoomOut, RotateCcw } from "lucide-react";
+import { Pencil, Settings2, Sun, Moon, ZoomIn, ZoomOut, RotateCcw } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -126,13 +126,9 @@ export function GeminiSidebar({ isOpen, onToggle, onNewChat }: GeminiSidebarProp
           )}
           aria-label={isOpen ? "Close sidebar" : "Open sidebar"}
         >
-          {isOpen ? (
-            <SidebarIcon className="h-5 w-5 flex-shrink-0" />
-          ) : (
-            <Menu className="h-5 w-5 flex-shrink-0" />
-          )}
+          <SidebarIcon className="h-5 w-5 flex-shrink-0" />
           {isOpen && (
-            <span className="ml-3 text-sm font-medium">Close Menu</span>
+            <span className="ml-3 text-sm"></span>
           )}
         </Button>
 
@@ -148,11 +144,10 @@ export function GeminiSidebar({ isOpen, onToggle, onNewChat }: GeminiSidebarProp
           aria-label="New Project"
           title="New Project"
         >
-          {isOpen ? (
-            <Pencil className="h-4 w-4 flex-shrink-0" />
-          ) : (
-            <Plus className="h-5 w-5 flex-shrink-0" />
-          )}
+          <Pencil className={cn(
+            "flex-shrink-0",
+            isOpen ? "h-4 w-4" : "h-5 w-5"
+          )} />
           {isOpen && (
             <span className="ml-3 text-sm">New chat</span>
           )}
@@ -187,7 +182,7 @@ export function GeminiSidebar({ isOpen, onToggle, onNewChat }: GeminiSidebarProp
       </div>
 
       {/* Bottom Section - Settings */}
-      <div className="p-2 flex-shrink-0 border-t">
+      <div className="p-2 flex-shrink-0">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button

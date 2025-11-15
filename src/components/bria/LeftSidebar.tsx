@@ -17,7 +17,17 @@ import {
   Sparkles,
   X,
   Loader2,
+  Image as ImageIcon,
+  Video,
+  Settings2,
 } from "lucide-react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { ChatInterface } from "./ChatInterface";
 import type { ChatMessage } from "@/types/chat";
@@ -362,6 +372,62 @@ export function LeftSidebar({
                 className="hidden"
                 aria-label="Upload reference image"
               />
+            </div>
+          </div>
+        </div>
+
+        {/* Mode Toggle and Model Selector */}
+        <div className="border-b">
+          <div className="px-4 pb-3 space-y-2">
+            <div className="flex items-center gap-2">
+            {/* Mode Toggle - Image/Video */}
+            <div className="flex rounded-md border flex-1">
+              <Button
+                variant={params.mode === "image" ? "default" : "ghost"}
+                size="sm"
+                className="h-8 px-3 rounded-r-none border-r flex-1"
+                onClick={() => onParamsChange({ mode: "image" })}
+                title="Image"
+              >
+                <ImageIcon className="h-3.5 w-3.5" />
+              </Button>
+              <Button
+                variant={params.mode === "video" ? "default" : "ghost"}
+                size="sm"
+                className="h-8 px-3 rounded-l-none flex-1"
+                onClick={() => onParamsChange({ mode: "video" })}
+                title="Video"
+              >
+                <Video className="h-3.5 w-3.5" />
+              </Button>
+            </div>
+
+            {/* Model - Direct Dropdown */}
+            <Select
+              value={params.model_version}
+              onValueChange={(value) =>
+                onParamsChange({ model_version: value as "Fibo" | "3.2" | "EA tailored" })
+              }
+            >
+              <SelectTrigger className="h-8 w-auto px-3 text-xs gap-1.5 border">
+                <Settings2 className="h-3.5 w-3.5" />
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="Fibo">Fibo</SelectItem>
+                <SelectItem value="3.2">3.2</SelectItem>
+                <SelectItem value="EA tailored">EA tailored</SelectItem>
+                <div className="px-2 py-1.5 text-xs border-t mt-1">
+                  <a
+                    href="#"
+                    className="text-primary hover:underline"
+                    onClick={(e) => e.preventDefault()}
+                  >
+                    train a tailored engine
+                  </a>
+                </div>
+              </SelectContent>
+            </Select>
             </div>
           </div>
         </div>

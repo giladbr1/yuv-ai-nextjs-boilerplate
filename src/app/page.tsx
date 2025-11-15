@@ -1,7 +1,6 @@
 "use client";
 
 import React, { Suspense, useState, useRef, useCallback } from "react";
-import { BriaHeader } from "@/components/bria/BriaHeader";
 import { LeftSidebar } from "@/components/bria/LeftSidebar";
 import { GeminiSidebar } from "@/components/bria/GeminiSidebar";
 import { useBriaGeneration } from "@/hooks/useBriaGeneration";
@@ -221,14 +220,6 @@ export default function Home() {
           marginLeft: isSidebarOpen ? `${SIDEBAR_WIDTH}px` : `${COLLAPSED_SIDEBAR_WIDTH}px`
         }}
       >
-        {/* Header */}
-        <BriaHeader
-          mode={params.mode}
-          modelVersion={params.model_version}
-          onModeChange={(mode) => updateParams({ mode })}
-          onModelChange={(model_version) => updateParams({ model_version })}
-        />
-
         {/* Main Content */}
         <div className="flex flex-1 overflow-hidden">
           {/* Left Sidebar - Instructions & Controls */}

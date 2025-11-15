@@ -25,7 +25,7 @@ export function ChatInterface({ messages, className }: ChatInterfaceProps) {
     <div
       ref={containerRef}
       className={cn(
-        "flex-1 overflow-y-auto bg-muted/20 p-4 space-y-4",
+        "flex-1 overflow-y-auto bg-muted/20 dark:bg-muted/10 p-4 space-y-4 scrollbar-thin scrollbar-thumb-muted scrollbar-track-transparent",
         className
       )}
     >

@@ -397,7 +397,7 @@ export function GenerationCanvas({
     <div
       ref={canvasRef}
       className={cn(
-        "relative flex items-center justify-center overflow-hidden bg-neutral-50",
+        "relative flex items-center justify-center overflow-hidden bg-neutral-50 dark:bg-black",
         className
       )}
       style={{
@@ -420,14 +420,14 @@ export function GenerationCanvas({
       {onOperationExecute && hasImage && (
         <div className="absolute top-6 left-1/2 -translate-x-1/2 z-50">
           <TooltipProvider delayDuration={200}>
-            <div className="flex items-center gap-1 bg-white/95 backdrop-blur-md rounded-full px-3 py-1.5 shadow-lg border border-neutral-200/50">
+            <div className="flex items-center gap-1 bg-white/95 dark:bg-black/80 backdrop-blur-md rounded-full px-3 py-1.5 shadow-lg dark:shadow-white/20 border border-neutral-200/50 dark:border-neutral-700/30">
               {/* Remove BG */}
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-7 w-7 rounded-full hover:bg-neutral-100 disabled:opacity-40"
+                    className="h-7 w-7 rounded-full hover:bg-neutral-100 dark:hover:bg-neutral-800 disabled:opacity-40"
                     onClick={() => onOperationExecute("remove-background")}
                     disabled={!hasImage}
                   >
@@ -439,7 +439,7 @@ export function GenerationCanvas({
                 </TooltipContent>
               </Tooltip>
 
-              <div className="w-px h-4 bg-neutral-200" />
+              <div className="w-px h-4 bg-neutral-200 dark:bg-neutral-700" />
 
               {/* Blur BG */}
               <Tooltip>
@@ -447,7 +447,7 @@ export function GenerationCanvas({
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-7 w-7 rounded-full hover:bg-neutral-100 disabled:opacity-40"
+                    className="h-7 w-7 rounded-full hover:bg-neutral-100 dark:hover:bg-neutral-800 disabled:opacity-40"
                     onClick={() => onOperationExecute("blur-background")}
                     disabled={!hasImage}
                   >
@@ -459,7 +459,7 @@ export function GenerationCanvas({
                 </TooltipContent>
               </Tooltip>
 
-              <div className="w-px h-4 bg-neutral-200" />
+              <div className="w-px h-4 bg-neutral-200 dark:bg-neutral-700" />
 
               {/* Enhance */}
               <Tooltip>
@@ -467,7 +467,7 @@ export function GenerationCanvas({
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-7 w-7 rounded-full hover:bg-neutral-100 disabled:opacity-40"
+                    className="h-7 w-7 rounded-full hover:bg-neutral-100 dark:hover:bg-neutral-800 disabled:opacity-40"
                     onClick={() => onOperationExecute("enhance-image")}
                     disabled={!hasImage}
                   >
@@ -479,7 +479,7 @@ export function GenerationCanvas({
                 </TooltipContent>
               </Tooltip>
 
-              <div className="w-px h-4 bg-neutral-200" />
+              <div className="w-px h-4 bg-neutral-200 dark:bg-neutral-700" />
 
               {/* Inpainting */}
               <Tooltip>
@@ -502,7 +502,7 @@ export function GenerationCanvas({
                 </TooltipContent>
               </Tooltip>
 
-              <div className="w-px h-4 bg-neutral-200" />
+              <div className="w-px h-4 bg-neutral-200 dark:bg-neutral-700" />
 
               {/* Upscale - with dropdown */}
               <Popover>
@@ -512,7 +512,7 @@ export function GenerationCanvas({
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="h-7 w-7 rounded-full hover:bg-neutral-100 disabled:opacity-40"
+                        className="h-7 w-7 rounded-full hover:bg-neutral-100 dark:hover:bg-neutral-800 disabled:opacity-40"
                         disabled={!hasImage}
                       >
                         <Zap className="h-3.5 w-3.5" />
@@ -549,7 +549,7 @@ export function GenerationCanvas({
                 </PopoverContent>
               </Popover>
 
-              <div className="w-px h-4 bg-neutral-200" />
+              <div className="w-px h-4 bg-neutral-200 dark:bg-neutral-700" />
 
               {/* Expand - with dropdown */}
               {onAspectRatioChange && (
@@ -560,7 +560,7 @@ export function GenerationCanvas({
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="h-7 w-7 rounded-full hover:bg-neutral-100 disabled:opacity-40"
+                          className="h-7 w-7 rounded-full hover:bg-neutral-100 dark:hover:bg-neutral-800 disabled:opacity-40"
                           disabled={!hasImage}
                         >
                           <Maximize2 className="h-3.5 w-3.5" />
@@ -611,7 +611,7 @@ export function GenerationCanvas({
           cx={1}
           cy={1}
           cr={1}
-          className="text-neutral-400/50"
+          className="text-neutral-400/50 dark:text-neutral-200/50"
         />
       </div>
       {/* Loading State */}
@@ -760,7 +760,7 @@ export function GenerationCanvas({
                       <Tooltip>
                         <TooltipTrigger asChild>
                           <button
-                            className="p-2 bg-neutral-50/50 text-foreground/60 hover:text-foreground transition-colors"
+                            className="p-2 bg-neutral-50/50 dark:bg-black/80 text-foreground/60 hover:text-foreground transition-colors"
                             aria-label="Content Credentials"
                           >
                             <Info className="h-3.5 w-3.5" />
@@ -775,7 +775,7 @@ export function GenerationCanvas({
                         <TooltipTrigger asChild>
                           <button
                             onClick={handleExport}
-                            className="p-2 bg-neutral-50/50 text-foreground/60 hover:text-foreground transition-colors"
+                            className="p-2 bg-neutral-50/50 dark:bg-black/80 text-foreground/60 hover:text-foreground transition-colors"
                             aria-label="Download"
                           >
                             <Download className="h-3.5 w-3.5" />
@@ -790,7 +790,7 @@ export function GenerationCanvas({
                         <TooltipTrigger asChild>
                           <button
                             onClick={handleFullscreen}
-                            className="p-2 bg-neutral-50/50 text-foreground/60 hover:text-foreground transition-colors"
+                            className="p-2 bg-neutral-50/50 dark:bg-black/80 text-foreground/60 hover:text-foreground transition-colors"
                             aria-label="Fullscreen"
                           >
                             <Maximize2 className="h-3.5 w-3.5" />
@@ -806,7 +806,7 @@ export function GenerationCanvas({
                           <button
                             onClick={() => handleFeedback('up')}
                             className={cn(
-                              "p-2 bg-neutral-50/50 transition-colors",
+                              "p-2 bg-neutral-50/50 dark:bg-black/80 transition-colors",
                               feedback === 'up' 
                                 ? "text-primary" 
                                 : "text-foreground/60 hover:text-foreground"
@@ -826,7 +826,7 @@ export function GenerationCanvas({
                           <button
                             onClick={() => handleFeedback('down')}
                             className={cn(
-                              "p-2 bg-neutral-50/50 transition-colors",
+                              "p-2 bg-neutral-50/50 dark:bg-black/80 transition-colors",
                               feedback === 'down' 
                                 ? "text-primary" 
                                 : "text-foreground/60 hover:text-foreground"
@@ -875,11 +875,11 @@ export function GenerationCanvas({
             transform: 'translate(-50%, 0)',
           }}
         >
-          <div className="flex items-center gap-2 bg-white/95 backdrop-blur-md rounded-full px-3 py-2 shadow-lg border border-neutral-200/50">
+          <div className="flex items-center gap-2 bg-white/95 dark:bg-black/80 backdrop-blur-md rounded-full px-3 py-2 shadow-lg dark:shadow-white/20 border border-neutral-200/50 dark:border-neutral-700/30">
             <Button
               variant="ghost"
               size="sm"
-              className="h-8 gap-2 hover:bg-neutral-100"
+              className="h-8 gap-2 hover:bg-neutral-100 dark:hover:bg-neutral-800"
               onClick={() => {
                 const maskBase64 = extractMask();
                 if (maskBase64 && onOperationExecute) {
@@ -899,11 +899,11 @@ export function GenerationCanvas({
               <Trash2 className="h-4 w-4" />
               <span className="text-sm font-medium">Erase</span>
             </Button>
-            <div className="w-px h-6 bg-neutral-200" />
+            <div className="w-px h-6 bg-neutral-200 dark:bg-neutral-700" />
             <Button
               variant="ghost"
               size="sm"
-              className="h-8 gap-2 hover:bg-neutral-100"
+              className="h-8 gap-2 hover:bg-neutral-100 dark:hover:bg-neutral-800"
               onClick={() => {
                 const maskBase64 = extractMask();
                 if (maskBase64) {
@@ -938,8 +938,8 @@ export function GenerationCanvas({
       {/* Brush Size Slider - Sticky Bottom */}
       {isInpaintingActive && (
         <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-40">
-          <div className="flex items-center gap-3 bg-white/95 backdrop-blur-md rounded-full px-4 py-2 shadow-lg border border-neutral-200/50">
-            <label htmlFor="brush-size" className="text-sm font-medium text-neutral-700 whitespace-nowrap">
+          <div className="flex items-center gap-3 bg-white/95 dark:bg-black/80 backdrop-blur-md rounded-full px-4 py-2 shadow-lg dark:shadow-white/20 border border-neutral-200/50 dark:border-neutral-700/30">
+            <label htmlFor="brush-size" className="text-sm font-medium text-neutral-700 dark:text-neutral-200 whitespace-nowrap">
               Brush Size:
             </label>
             <input
@@ -949,9 +949,9 @@ export function GenerationCanvas({
               max="100"
               value={brushSize}
               onChange={(e) => setBrushSize(Number(e.target.value))}
-              className="w-32 h-1 bg-neutral-200 rounded-lg appearance-none cursor-pointer accent-primary"
+              className="w-32 h-1 bg-neutral-200 dark:bg-neutral-700 rounded-lg appearance-none cursor-pointer accent-primary"
             />
-            <span className="text-sm font-medium text-neutral-700 w-8 text-right">
+            <span className="text-sm font-medium text-neutral-700 dark:text-neutral-200 w-8 text-right">
               {brushSize}
             </span>
           </div>
